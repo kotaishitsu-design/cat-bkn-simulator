@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Portal Simulasi Mandiri CAT BKN - PPPK TENDIK</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for in-browser JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; margin: 0; padding: 0; overflow-x: hidden; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        
+        /* Tema Warna BKN */
+        .bg-cat-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%); }
+        .text-cat-blue { color: #1e3a8a; }
+        
+        /* Opsi Jawaban */
+        .option-hover { transition: all 0.2s ease; }
+        .option-hover:hover { background-color: #f8fafc; border-color: #cbd5e1; cursor: pointer; transform: translateY(-1px); }
+        .option-hover:active { transform: translateY(0); }
+        .option-selected { background-color: #eff6ff; border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; transition: all 0.2s ease; }
+        
+        /* Tombol Navigasi Bawah */
+        .btn-ragu { border-color: #fbbf24; color: #d97706; background-color: #fef3c7; }
+        
+        /* Kotak Nomor Navigasi */
+        .nav-box { 
+            width: 100%; aspect-ratio: 1/1; max-height: 40px; 
+            display: flex; align-items: center; justify-content: center; 
+            border-radius: 6px; font-weight: 600; font-size: 0.875rem; 
+            cursor: pointer; transition: all 0.2s; 
+        }
+        .nav-belum { border: 1px solid #cbd5e1; background: #fff; color: #475569; }
+        .nav-sudah { background: #10b981; color: #fff; border: 1px solid #059669; }
+        .nav-ragu { background: #fbbf24; color: #fff; border: 1px solid #d97706; }
+        .nav-active { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4); transform: scale(1.05); z-index: 10; }
+        .nav-locked { opacity: 0.4; cursor: not-allowed; background-color: #e2e8f0; border-color: #cbd5e1; }
+        .nav-locked.nav-sudah { background-color: #6ee7b7; border-color: #10b981; opacity: 0.6; }
+
+        /* Animasi untuk Drawer Mobile */
+        @keyframes slideInRight {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-slide-in { animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-blue-200 selection:text-blue-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- ICONS (SVG) ---
+        const ShieldIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>;
+        const BuildingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></svg>;
+        const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>;
+        const ClockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>;
+        const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+        const ArrowRightIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>;
+        const LockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
+        const GridMenuIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
+        const XIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+        const CheckCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
+        const TrueCheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>;
+        const FalseXIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+        const AlertTriangleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
+
+        const rawTextData = `1. Terjadi pemotongan anggaran mendadak di pertengahan tahun yang memengaruhi ketersediaan kertas kerja. Sebagai koordinator tata usaha, langkah strategis Anda? A. Meminta seluruh staf menggunakan dana pribadi secara patungan agar pelayanan tidak terhenti.B. Melakukan digitalisasi dokumen internal dan memperketat SOP pencetakan hanya untuk dokumen final eksternal.C. Melaporkan kondisi tersebut kepada Kepala Sekolah dan menunda pencetakan hingga ada instruksi lanjutan.D. Meminjam persediaan kertas dari instansi kelurahan terdekat untuk diganti pada anggaran tahun depan.E. Membatasi jam operasional layanan tata usaha untuk menekan laju penggunaan kertas. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Pengambilan Keputusan]
+2. Kepala Tata Usaha yang baru menerapkan sistem pelaporan harian yang menurut Anda terlalu rinci dan justru memakan waktu operasional. Sikap Anda? A. Mengerjakan laporan tersebut setelah jam kerja selesai agar tidak mengganggu pelayanan masyarakat.B. Mengikuti sistem tersebut sambil mendata inefisiensi waktu, lalu mengajukan draf usulan penyederhanaan format di akhir bulan.C. Mengeluhkan sistem tersebut kepada sesama staf di ruang istirahat untuk mencari dukungan penolakan.D. Meminta pengecualian kepada Kepala TU agar staf lama diperbolehkan menggunakan format yang lama.E. Mendelegasikan tugas pembuatan laporan tersebut kepada tenaga honorer yang beban kerjanya lebih ringan. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Mengelola Perubahan]
+3. Anda menemukan rekan kerja satu tim menunda pengiriman dokumen pencairan dana BOS padahal tenggat waktu tinggal 2 hari. Respon Anda? A. Melaporkan rekan tersebut kepada Kepala Sekolah agar diberikan teguran tertulis.B. Mengambil alih dokumen tersebut dan mengirimkannya sendiri untuk menyelamatkan nama baik instansi.C. Mengingatkan rekan tersebut secara profesional, menanyakan letak hambatannya, dan menawarkan bantuan agar tuntas hari ini.D. Fokus pada pekerjaan sendiri karena dokumen tersebut berada di luar deskripsi pekerjaan Anda.E. Mengirimkan email pengingat kepada rekan tersebut dan menembuskannya (cc) kepada atasan sebagai bukti. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Kerja Sama]
+4. Dalam penyusunan SOP layanan baru, ada perbedaan pendapat tajam antara bagian kearsipan dan pelayanan terkait alur serah terima berkas. Tindakan Anda sebagai fasilitator? A. Mendukung pendapat bagian pelayanan karena mereka yang berhadapan langsung dengan masyarakat.B. Mengambil keputusan mutlak secara mandiri demi efisiensi waktu penyelesaian SOP.C. Memfasilitasi diskusi dengan merujuk pada PermenPANRB tentang Tata Naskah Dinas sebagai standar objektif penengah.D. Menunda pengesahan SOP hingga kedua bagian tersebut mencapai kesepakatan secara alami.E. Meminta Kepala Sekolah untuk langsung memilih salah satu usulan tanpa perlu diskusi lanjutan. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Komunikasi]
+5. Anda ditunjuk memimpin sosialisasi aplikasi persuratan Srikandi kepada para guru senior yang merasa sistem manual sudah cukup baik. Strategi Anda? A. Membagikan buku panduan cetak dan mempersilakan guru senior mempelajarinya secara mandiri.B. Meminta kebijakan khusus agar guru senior tetap diizinkan menggunakan sistem persuratan manual.C. Melakukan pendampingan personal secara bertahap dengan menunjukkan bagaimana aplikasi tersebut memangkas waktu kerja mereka.D. Menyarankan agar tugas persuratan guru senior dilimpahkan sepenuhnya kepada staf tata usaha.E. Mengajukan sanksi administratif bagi pegawai yang menolak menggunakan aplikasi baru tersebut. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Pengembangan Diri dan Orang Lain]
+6. Tiba-tiba server database sekolah down akibat gangguan teknis pusat, padahal pendaftaran siswa baru sedang padat. Tindakan operasional Anda? A. Membuat pengumuman penundaan pendaftaran hingga server pusat kembali normal.B. Menginstruksikan warga untuk mendaftar dari rumah masing-masing setelah sistem pulih.C. Beralih ke SOP darurat dengan mencatat pendaftaran secara manual dan memberikan nomor registrasi sementara.D. Menghubungi teknisi pusat secara terus-menerus hingga mereka memperbaiki server saat itu juga.E. Meminta maaf kepada pendaftar dan membagikan brosur sekolah sebagai kompensasi. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Pengambilan Keputusan]
+7. Anda menerima instruksi dari dua Wakil Kepala Sekolah (Bidang Kurikulum dan Bidang Kesiswaan) dengan format yang berlawanan terkait rekap data absensi. Langkah Anda? A. Membuat dua jenis laporan absensi yang berbeda agar kedua wakil kepala sekolah merasa dihormati.B. Mengikuti format Wakil Kepala Sekolah yang jabatannya lebih senior atau masa kerjanya lebih lama.C. Menginisiasi pertemuan singkat dengan keduanya untuk menyepakati satu format terpadu guna menghindari duplikasi kerja.D. Tetap menggunakan format standar tata usaha dan mengabaikan instruksi khusus dari keduanya.E. Mengerjakan instruksi yang masuk lebih awal dan mengabaikan instruksi yang datang belakangan. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Komunikasi]
+8. Atasan menyoroti bahwa loket layanan Anda sering kosong saat jam kerja, padahal Anda sedang bertugas merapikan berkas di ruang arsip belakang. Solusi Anda? A. Meminta atasan meninjau kembali uraian tugas Anda yang tumpang tindih.B. Membawa tumpukan arsip ke meja loket dan merapikannya sambil melayani tamu.C. Menyepakati jadwal khusus pencarian arsip dengan tim, atau memberlakukan sistem keranjang transit agar loket tidak kosong.D. Menyuruh petugas kebersihan untuk berjaga di loket sementara Anda di ruang arsip.E. Memasang papan 'Sedang di Ruang Arsip, Silakan Menunggu' di meja layanan. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Orientasi pada Hasil]
+9. Sekolah menerima banyak sumbangan barang fasilitas dari alumni yang belum terdata, sehingga penggunaannya tidak terkoordinir. Inisiatif Anda? A. Menyimpan barang tersebut di gudang tertutup sampai ada instruksi dari pimpinan.B. Langsung mendistribusikan barang tersebut ke kelas-kelas yang membutuhkan agar segera bermanfaat.C. Mengusulkan inventarisasi cepat, pelabelan barang hibah, dan pencatatan di Buku Induk Barang sebelum didistribusikan.D. Menyarankan agar barang tersebut disumbangkan kembali ke panti asuhan karena administrasi sekolah sudah repot.E. Menggunakan barang tersebut untuk keperluan ruang tata usaha terlebih dahulu. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Orientasi pada Hasil]
+10. Seorang staf baru di bagian Anda sering salah menginput NIK siswa ke Dapodik. Sebagai rekan senior, Anda... A. Membantu memperbaiki kesalahannya setiap hari agar data sekolah tidak bermasalah di pusat.B. Melaporkan staf tersebut kepada atasan karena dapat menghambat pencairan dana bantuan siswa.C. Mengevaluasi hasil kerjanya, menjelaskan letak kesalahan sistemik, dan mengajarkan metode verifikasi ganda (double-check).D. Menyarankan staf tersebut untuk dipindah ke bagian pengarsipan fisik yang risiko kesalahannya lebih rendah.E. Meminta staf tersebut membuat surat pernyataan bersedia menanggung risiko hukum jika data salah. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Pengembangan Diri dan Orang Lain]
+11. Anda dijanjikan promosi jika menyelesaikan digitalisasi arsip bulan ini. Di tengah proyek, atasan yang menjanjikan dipindahtugaskan. Sikap Anda? A. Mengurangi prioritas proyek tersebut dan kembali fokus pada tugas administrasi harian yang rutin.B. Tetap menyelesaikan digitalisasi sesuai target awal karena hal tersebut membawa manfaat efisiensi bagi institusi.C. Menghadap atasan yang baru untuk memastikan apakah janji promosi tersebut masih berlaku sebelum melanjutkan.D. Mengerjakan sisa dokumen dengan standar seadanya karena motivasi utama telah hilang.E. Menyerahkan kelanjutan proyek tersebut kepada staf junior. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Integritas]
+12. Anda menemukan rumus Excel otomatis yang bisa mempercepat pembuatan rekap nilai 50%, namun metode ini belum tertulis dalam SOP resmi. Tindakan Anda? A. Menerapkan rumus tersebut secara personal agar pekerjaan Anda selalu selesai paling awal.B. Mendokumentasikan prosedur penggunaan rumus tersebut dan mengajukannya sebagai usulan revisi SOP kepada atasan.C. Tetap menggunakan cara manual sesuai SOP untuk menghindari teguran jika terjadi kesalahan sistem.D. Mengajarkan rumus tersebut kepada rekan dekat saja tanpa sepengetahuan atasan.E. Menunggu jadwal evaluasi tahunan untuk menyampaikan ide tersebut. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Mengelola Perubahan]
+13. Dalam persiapan ujian, mesin fotokopi sekolah rusak parah. Anda bertanggung jawab atas penggandaan soal rahasia untuk esok pagi. Tindakan Anda? A. Menghubungi teknisi dan menunda ujian beberapa jam hingga mesin selesai diperbaiki.B. Mencari jasa fotokopi komersial dengan pengawalan ketat dan menandatangani pakta integritas kerahasiaan dengan pihak vendor.C. Mengirimkan softcopy soal kepada guru wali kelas agar mereka yang mencari cara mencetak sendiri.D. Menggunakan dana darurat untuk langsung membeli mesin fotokopi baru malam itu juga.E. Meminta siswa menyalin soal dari papan tulis saat ujian berlangsung. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Pengambilan Keputusan]
+14. Anda diberi tugas menarik data spesifik dari sistem Dapodik yang fiturnya sangat kompleks dan belum pernah Anda pelajari. Sikap Anda? A. Melaporkan kepada atasan bahwa tugas tersebut di luar kompetensi teknis Anda saat ini.B. Menerima tugas, mempelajari panduan resminya (tutorial/helpdesk), dan berkonsultasi dengan operator dinas agar selesai tepat waktu.C. Menyerahkan tugas tersebut kepada rekan kerja yang memiliki latar belakang Sarjana Komputer.D. Menyelesaikan tugas tersebut dengan perkiraan/estimasi data manual agar atasan tidak menunggu lama.E. Meminta perpanjangan waktu yang sangat lama agar bisa mengikuti kursus komputer terlebih dahulu. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Orientasi pada Hasil]
+15. Banyak orang tua wali protes karena layanan legalisir sering tertunda saat Kepala Sekolah sedang rapat di luar dinas. Inisiatif manajerial Anda? A. Meminta orang tua wali memaklumi kesibukan Kepala Sekolah yang padat.B. Mengusulkan pendelegasian wewenang legalisir sementara (Plh/a.n) kepada Wakil Kepala Sekolah atau Kepala TU sesuai tata naskah.C. Menumpuk dokumen tersebut dan baru mengerjakannya setelah Kepala Sekolah kembali bertugas.D. Menyarankan Kepala Sekolah untuk tidak mengambil jadwal rapat dinas luar saat musim kelulusan.E. Membubuhkan stempel tanda tangan Kepala Sekolah agar warga tidak marah. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Pelayanan Publik]
+16. Anda mengetahui bahwa salah satu kendaraan operasional sekolah sering digunakan rekan kerja untuk menjemput anaknya di luar jam dinas. Tindakan Anda? A. Mengabaikannya selama rekan tersebut tetap mengisi bensin kendaraan menggunakan uang pribadinya.B. Menegur secara asertif terkait aturan aset BMD, dan menyarankan ia menggunakan kendaraan pribadi.C. Menggunakan kendaraan operasional tersebut untuk keperluan Anda sendiri agar adil.D. Langsung mengirimkan foto rekan tersebut ke grup WhatsApp kantor agar ia mendapat sanksi sosial.E. Melaporkan ke atasan dengan syarat identitas Anda sebagai pelapor dirahasiakan. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Integritas]
+17. Target penyusunan laporan persediaan barang bulanan selalu terlambat karena guru sering lambat melaporkan pemakaian barang. Solusi tim Anda? A. Membuat laporan berdasarkan estimasi pemakaian rata-rata bulan lalu agar tepat waktu.B. Melaporkan guru-guru tersebut kepada Kepala Sekolah sebagai penghambat birokrasi.C. Menerapkan sistem pelaporan satu pintu berbasis formulir digital sederhana yang wajib diisi guru saat mengambil barang.D. Menolak memberikan barang kebutuhan mengajar sampai guru menyerahkan laporan bulan sebelumnya.E. Membiarkan laporan terlambat karena itu adalah kesalahan sistemik dari pihak guru. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Kerja Sama]
+18. Terdapat surat edaran baru dari kementerian yang mengharuskan penggunaan format tata naskah dinas elektronik, padahal sekolah belum punya fasilitas memadai. Sikap Anda? A. Mengabaikan edaran tersebut dan terus menggunakan naskah dinas kertas hingga anggaran turun.B. Memaksa seluruh staf menggunakan komputer pribadi window mereka untuk mendukung edaran kementerian.C. Menyusun analisis kebutuhan perangkat keras/lunak untuk diajukan dalam Rencana Anggaran, sambil melakukan transisi bertahap.D. Mengirim surat balasan ke kementerian menyatakan sekolah Anda tidak sanggup menjalankan kebijakan tersebut.E. Mengurangi beban kerja administrasi lain agar bisa fokus memikirkan format elektronik. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Mengelola Perubahan]
+19. Sepulang dari diklat pelayanan prima, Anda mendapati kultur layanan di sekolah Anda masih kaku dan cenderung tidak ramah. Tindakan awal Anda? A. Menegur atasan karena membiarkan kultur layanan yang buruk terjadi selama bertahun-tahun.B. Membuat laporan resmi ke dinas pendidikan terkait kualitas layanan yang tidak sesuai standar.C. Menjadi role model (teladan) layanan ramah di loket Anda sendiri dan perlahan mengajak rekan kerja mempraktikkannya.D. Menunggu instruksi resmi dari Kepala Sekolah untuk melakukan perubahan budaya kerja.E. Mencetak seluruh modul diklat dan mewajibkan rekan kerja membacanya sampai tuntas. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Pengembangan Diri dan Orang Lain]
+20. Di meja Anda terdapat draf laporan SPJ Keuangan yang deadline-nya dua jam lagi, sementara di depan Anda ada tamu dari Dinas Pendidikan yang ingin meninjau ruang kelas. Langkah Anda? A. Meminta tamu tersebut berkeliling sekolah sendiri karena Anda sedang dikejar tenggat waktu laporan.B. Meninggalkan draf laporan SPJ sepenuhnya dan mendampingi tamu Dinas seharian penuh.C. Menyambut tamu dengan hormat, mengomunikasikan kondisi deadline, dan meminta rekan lain untuk mendampingi tamu meninjau kelas.D. Meminta perpanjangan tenggat waktu SPJ kepada atasan karena ada tamu mendadak.E. Menyuruh tenaga honorer mengerjakan laporan keuangan sementara Anda menemani tamu. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Pelayanan Publik]
+21. Penggunaan mesin scanner arsip di ruang TU sering memicu konflik karena tidak adanya jadwal giliran yang jelas antar staf. Solusi Anda? A. Meminta sekolah membeli mesin scanner baru untuk setiap staf TU.B. Membawa dokumen Anda ke luar sekolah dan melakukan pemindaian (scan) menggunakan dana pribadi.C. Menginisiasi pembuatan jadwal penggunaan (logbook) yang transparan dan SOP durasi maksimal penggunaan.D. Mengalah dan selalu menggunakan mesin scanner setelah semua staf pulang kerja.E. Menyembunyikan kabel mesin scanner agar tidak ada yang bisa menggunakannya hingga ada aturan resmi. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Komunikasi]
+22. Dalam proses PPDB online, seorang wali murid terus memaksa Anda untuk menerima berkas manualnya karena ia tidak mengerti internet. Respons Anda? A. Menerima berkas manualnya agar ia segera pergi dan tidak membuat keributan di loket.B. Memberikan penolakan lugas dengan memberikan tautan website PPDB dan menyuruhnya belajar internet.C. Mempersilakan duduk, meminjamkan perangkat kantor, dan memandu wali murid tersebut melakukan pendaftaran online langkah demi langkah.D. Meminta ia pulang dan meminta tolong kepada tetangganya yang paham internet.E. Meminta biaya administrasi tambahan untuk jasa menginputkan data ke sistem online. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Pelayanan Publik]
+23. Warga sekitar sekolah sering duduk santai di ruang tunggu Tata Usaha yang ber-AC, padahal mereka tidak sedang mengurus administrasi. Sikap Anda? A. Mematikan AC ruang tunggu agar warga merasa tidak nyaman dan pergi dengan sendirinya.B. Menegur warga dengan suara keras di depan tamu lain agar mereka malu.C. Menyediakan area duduk alternatif di teras luar, dan secara persuasif mengingatkan bahwa ruang dalam dikhususkan untuk kelancaran layanan.D. Membiarkan warga tersebut karena instansi pemerintah adalah fasilitas publik untuk siapa saja.E. Menelepon petugas keamanan untuk mengusir warga secara paksa setiap hari. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Orientasi pada Hasil]
+24. Anda melihat seorang pimpinan sekolah memerintahkan staf administrasi untuk memanipulasi nota pembelian agar sesuai dengan laporan anggaran belanja. Posisi Anda? A. Mengikuti perintah tersebut karena pimpinan adalah pemegang otoritas tertinggi di instansi.B. Mengumpulkan bukti-bukti diam-diam untuk memeras pimpinan tersebut di kemudian hari.C. Secara asertif menolak memalsukan dokumen, menjelaskan konsekuensi hukum temuan auditor, dan menawarkan solusi ralat anggaran yang legal.D. Menyetujui perintah namun meminta staf lain yang menandatangani dokumen tersebut.E. Mengajukan cuti panjang untuk menghindari keterlibatan dalam pelaporan keuangan tersebut. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Integritas]
+25. Sebagai staf senior, Anda ditugaskan membimbing PPPK baru. Pegawai baru ini sangat teoritis namun lambat dalam praktik administrasi cepat. Tindakan Anda? A. Memindahkan pegawai baru tersebut ke posisi pengonsep surat yang tidak butuh kecepatan ketik.B. Menurunkan ekspektasi kinerja unit kerja agar sesuai dengan kecepatan pegawai baru tersebut.C. Mengenalkan trik operasional (shortcut sistem, template), memberikan target bertahap, dan mengevaluasi peningkatannya mingguan.D. Membiarkannya bekerja lambat selama hasil ketikannya rapi dan bebas dari kesalahan.E. Mengerjakan sisa pekerjaannya setiap hari agar performa unit tidak terlihat buruk di mata pimpinan. [Materi Pokok: Kompetensi Manajerial][Kategori: Manajerial - Pengembangan Diri dan Orang Lain]
+26. Seorang wali murid ekspatriat (WNA) datang ke loket. Ia berbicara cepat, langsung pada inti masalah tanpa basa-basi, yang dianggap staf lain 'kasar'. Perspektif Anda? A. Menegur WNA tersebut agar menyesuaikan diri dengan budaya sopan santun ketimuran sebelum dilayani.B. Memahami bahwa itu murni perbedaan budaya low-context communication, dan meresponsnya dengan jelas, efisien, serta profesional.C. Melayaninya dengan bahasa daerah secara sengaja agar ia merasa kesulitan berkomunikasi.D. Meminta staf lain yang menangani WNA tersebut karena Anda takut salah bicara.E. Menanggapi dengan nada yang sama kerasnya untuk menunjukkan bahwa Anda tegas. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kepekaan terhadap Keberagaman]
+27. Masyarakat lokal tempat sekolah berada melarang penebangan pohon tertentu di lingkungan sekolah karena dianggap sakral. Padahal pohon itu merusak pondasi bangunan TU. Solusi Anda? A. Menyuruh kontraktor menebang pohon tersebut diam-diam pada malam hari.B. Membiarkan bangunan TU hancur demi menghormati kepercayaan warga lokal secara mutlak.C. Berkomunikasi dengan tokoh adat setempat, menjelaskan risiko fisik bangunan, dan mencari solusi kompromi (seperti upacara pemindahan).D. Meminta aparat kepolisian menjaga lokasi saat penebangan dilakukan secara paksa.E. Mengancam akan menutup akses warga ke fasilitas sekolah jika mereka menghalangi. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kemampuan Berhubungan Sosial]
+28. Sekolah menerima siswa dengan Neurodivergent (kebutuhan khusus interaksi). Beberapa orang tua reguler mendesak agar siswa tersebut dikeluarkan. Peran Anda di bagian administrasi? A. Memisahkan berkas siswa tersebut dan merekomendasikan kepala sekolah untuk memindahkannya ke SLB.B. Bersikap netral, mengedukasi orang tua reguler tentang regulasi sekolah inklusi, dan melayani siswa tersebut dengan setara tanpa diskriminasi.C. Mendukung protes orang tua reguler karena sekolah umum memang tidak dirancang untuk siswa khusus.D. Menyarankan orang tua siswa khusus tersebut untuk mengalah demi ketenangan mayoritas.E. Menghindari interaksi dengan orang tua dari kedua belah pihak agar tidak terseret konflik. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Empati]
+29. Di masa Pemilu, dua orang staf TU berdebat panas secara terbuka di ruang kerja membela calon kepala daerah masing-masing. Langkah penengah Anda? A. Ikut bergabung dalam perdebatan untuk membela calon yang memiliki elektabilitas paling tinggi.B. Mengingatkan mereka akan kode etik netralitas ASN di lingkungan kerja dan meminta perdebatan dihentikan demi kondusivitas pelayanan.C. Merekam perdebatan tersebut untuk dilaporkan ke Bawaslu atau Komisi ASN.D. Menutup pintu ruang tata usaha agar suara perdebatan mereka tidak terdengar tamu luar.E. Membiarkan mereka berdebat selama tugas harian mereka tetap diselesaikan tepat waktu. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kepekaan terhadap Pentingnya Persatuan]
+30. Seorang kolega baru berasal dari daerah dengan budaya egaliter, sehingga ia memanggil Kepala Sekolah tanpa gelar kebangsawanan/akademik yang biasa dipakai warga lokal. Reaksi Anda? A. Membiarkannya karena memanggil tanpa gelar bukanlah sebuah tindak pidana.B. Memarahi kolega baru tersebut di depan Kepala Sekolah agar ia menyadari kesalahannya.C. Memberikan penjelasan kultural secara empatik di belakang layar mengenai pentingnya penggunaan sapaan lokal di lingkungan tersebut.D. Menghindari kolega tersebut agar Anda tidak ikut dicap tidak sopan oleh masyarakat.E. Mengingatkan kolega baru dengan cara meniru sapaan egaliternya kepada dirinya. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kepekaan terhadap Keberagaman]
+31. Saat bulan Ramadhan, kantin sekolah tutup sepenuhnya. Rekan kerja yang tidak berpuasa merasa kesulitan mencari makan dan mengeluh di kantor. Sikap Anda? A. Menegur rekan tersebut karena tidak menghormati orang yang sedang beribadah puasa.B. Menyediakan ruang kecil tertutup di area belakang kantor yang bisa digunakan untuk makan tanpa mengganggu staf yang berpuasa.C. Mengusulkan agar staf yang tidak berpuasa dipulangkan lebih awal setiap hari.D. Memaksa rekan tersebut untuk ikut berpuasa sebagai bentuk toleransi beragama.E. Menganjurkan rekan tersebut makan di meja kerjanya secara terang-terangan karena itu hak pribadinya. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Empati]
+32. Acara study tour sekolah membutuhkan iuran siswa yang cukup besar. Seorang siswa yang Anda kenal berasal dari keluarga kurang mampu terlihat murung di loket pembayaran. Inisiatif Anda? A. Memberitahu seluruh siswa lain agar mereka patungan membiayai anak tersebut.B. Menawarkan bantuan untuk mengisikan formulir pengajuan keringanan/pembebasan biaya ke komite sekolah dengan menjaga privasinya.C. Menyarankan siswa tersebut tidak perlu ikut study tour karena hanya membuang-buang uang.D. Meminjami siswa tersebut uang dengan bunga rendah.E. Membiarkan siswa tersebut karena masalah ekonomi adalah tanggung jawab keluarganya sendiri. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Empati]
+33. Guru senior sering menolak mengikuti prosedur digitalisasi administrasi yang Anda buat karena merasa itu 'cara anak muda'. Cara komunikasi lintas generasi Anda? A. Membiarkan guru senior tersebut menggunakan cara manual selamanya agar tidak repot.B. Meminta Kepala Sekolah membuat surat teguran resmi agar guru senior tersebut mematuhi aturan.C. Menghargai pengalamannya, lalu memberikan panduan taktis yang sangat ringkas, dan menawarkan asistensi teknis kapan pun ia butuhkan.D. Mengerjakan porsi digitalisasi milik guru senior tersebut setiap hari dengan diam-diam.E. Menyindir kemampuan teknologi guru senior di grup WhatsApp internal. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kemampuan Berhubungan Sosial]
+34. Sekolah berencana membangun lapangan olahraga baru yang debunya berpotensi mengganggu jemuran warga desa yang menempel di tembok sekolah. Solusi sosial Anda? A. Melanjutkan pembangunan karena lahan tersebut adalah aset sah milik pemerintah/sekolah.B. Membatalkan proyek lapangan demi menjaga kerukunan dengan warga yang tinggal berbatasan tembok.C. Melakukan sosialisasi ke warga, membagikan masker/plastik pelindung, menjadwalkan pekerjaan berdebu pada jam tertentu.D. Menyuruh kontraktor mengusir warga yang komplain terkait debu proyek.E. Membangun tembok pembatas setinggi 5 meter tanpa pemberitahuan ke warga desa. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kemampuan Berhubungan Sosial]
+35. Di loket, Anda mendapati kebiasaan warga menyelipkan 'uang lelah' ke dalam map berkas. Anda ingin menghapus pungli tanpa mempermalukan warga. Cara Anda? A. Mengambil uang tersebut lalu membagikannya ke anak yatim piatu agar berkah.B. Mengembalikan map secara diam-diam tanpa suara, lalu menunjuk tanda stiker 'Layanan 100% Gratis' sambil tersenyum.C. Meneriaki warga tersebut bahwa menyuap aparat adalah tindak pidana korupsi.D. Menerima uangnya karena menolak pemberian dianggap pamali oleh budaya warga sekitar.E. Menutup loket saat warga tersebut datang agar ia sadar tindakannya salah. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kepekaan terhadap Pentingnya Persatuan]
+36. Seorang siswi pindahan dari pulau lain sering dijauhi teman-temannya karena dialek bahasanya yang unik. Saat ia mengurus berkas di TU, tindakan preventif Anda? A. Menyarankan siswi tersebut mengubah cara bicaranya agar segera diterima teman-temannya.B. Meresponsnya dengan dialek yang sama secara berlebihan agar ia merasa terhibur.C. Memberikan layanan dengan sangat ramah, memvalidasi identitasnya secara positif, dan segera melaporkan dinamika pengucilan ini ke guru BK.D. Memanggil teman-teman yang menjauhinya dan menghukum mereka di ruang tata usaha.E. Fokus memproses dokumennya dan menganggap masalah pergaulan adalah hal biasa di usia remaja. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Empati]
+37. Staf honorer di ruangan Anda yang berbeda suku memiliki budaya berbicara dengan intonasi sangat keras. Atasan Anda dari suku lain merasa tersinggung. Peran mediator Anda? A. Mengiyakan pendapat atasan dan ikut menjauhi staf honorer tersebut.B. Menyuruh staf honorer tersebut diam sepanjang hari selama berada di ruangan kantor.C. Menjelaskan konteks budaya staf tersebut kepada atasan, sambil mengingatkan sang staf tentang adaptasi volume suara di ruang publik.D. Meminta staf honorer tersebut membuat surat permintaan maaf tertulis bermaterai.E. Menyarankan atasan untuk menggunakan penutup telinga (earplug) saat bekerja. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kepekaan terhadap Keberagaman]
+38. Saat merencanakan kegiatan outing tahunan tata usaha, mayoritas staf ingin wisata ke pantai, namun ada rekan difabel fisik yang kesulitan mobilitas di pasir. Tindakan Anda? A. Meminta rekan difabel untuk tidak ikut outing tahun ini dan diganti tahun depan.B. Menyuruh rekan difabel untuk tetap ikut dan menjanjikan akan digendong bersama-sama.C. Mengusulkan pergantian lokasi outing yang 100% ramah aksesibilitas (wheelchair friendly) agar semua anggota tim merasa inklusif.D. Memecah rombongan menjadi dua: satu ke pantai, satu ke tempat lain yang mudah diakses.E. Membatalkan kegiatan outing sepenuhnya agar tidak ada yang merasa didiskriminasi. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kepekaan terhadap Keberagaman]
+39. Sebuah ormas kedaerahan menawarkan dana perbaikan atap sekolah yang bocor, namun meminta sekolah memasang bendera ormas mereka secara permanen di gerbang. Kebijakan Anda? A. Menerima tawaran tersebut sementara waktu, lalu mencabut benderanya diam-diam setelah atap selesai diperbaiki.B. Menolak dengan bahasa yang sangat diplomatis dan merujuk pada regulasi netralitas simbolik institusi pendidikan negeri.C. Menyetujui persyaratan tersebut karena perbaikan atap adalah prioritas keselamatan siswa.D. Melaporkan ormas tersebut ke kepolisian atas tuduhan intervensi lembaga negara.E. Meminta komite sekolah yang memasang bendera tersebut agar sekolah tidak disalahkan dinas. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kemampuan Berhubungan Sosial]
+40. Seorang lansia yang buta huruf datang sendirian ke loket PPDB untuk mendaftarkan cucunya. Antrean sedang sangat padat. Prioritas layanan Anda? A. Meminta lansia tersebut antre dari awal dan meminta tolong pendaftar di sebelahnya untuk membantunya mengisi form.B. Menyarankan lansia tersebut pulang dan kembali lagi esok hari dengan membawa kerabat yang bisa membaca.C. Mengalokasikan staf cadangan atau menggunakan skema prioritas untuk membacakan dan menginput data lansia tersebut hingga tuntas.D. Memproses berkas lansia tersebut dengan data seadanya agar antrean lain tidak protes.E. Menyuruh lansia tersebut mencari warnet atau jasa pengetikan di luar sekolah. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Empati]
+41. Anda diundang ke upacara duka cita adat rekan kerja yang tata caranya sama sekali belum pernah Anda lihat. Langkah kultural Anda? A. Hadir dengan pakaian dinas PNS karena itu adalah seragam paling formal dan aman.B. Hadir sebentar saja untuk mengisi daftar tamu lalu segera pulang agar terhindar dari salah sikap.C. Bertanya terlebih dahulu kepada kerabat rekan tersebut terkait etika berpakaian, pantangan ucapan, dan perilaku yang pantas selama ritual.D. Mencari alasan logis untuk tidak hadir dan cukup mengirimkan karangan bunga.E. Merekam seluruh prosesi adat tersebut dengan smartphone untuk dipelajari di rumah. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kepekaan terhadap Keberagaman]
+42. Sekolah kedatangan siswa pertukaran pelajar dari negara konflik. Beberapa siswa lokal enggan bergaul karena termakan stereotip di media sosial. Langkah administratif-sosial Anda? A. Menyediakan meja layanan tersendiri bagi siswa pertukaran agar ia terhindar dari kontak fisik dengan siswa lokal.B. Bekerja sama dengan kesiswaan untuk membuat program orientasi multikultural guna menetralisir stereotip dan menjembatani asimilasi.C. Memarahi siswa lokal yang menjauhi siswa pertukaran tersebut setiap kali bertemu di TU.D. Mengabaikan fenomena tersebut karena urusan interaksi siswa murni kewenangan guru kelas.E. Menasihati siswa pertukaran pelajar untuk memaklumi ketidaktahuan siswa lokal. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kepekaan terhadap Pentingnya Persatuan]
+43. Grup WhatsApp Tata Usaha sering diisi perdebatan tentang superioritas satu suku atas suku lain oleh staf senior. Respons Anda di dalam grup? A. Langsung keluar (Leave Group) sebagai bentuk protes diam tanpa memberikan penjelasan.B. Ikut mengirimkan artikel yang menunjukkan keunggulan suku Anda sendiri agar adil.C. Secara halus mengalihkan topik ke ranah profesional pekerjaan, atau secara privat meminta admin grup menegakkan aturan etika komunikasi.D. Mendebat staf senior tersebut di grup dengan argumen akademis antropologi.E. Menghapus (delete for me) pesan-pesan tersebut namun tetap membiarkan perdebatan terjadi. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kepekaan terhadap Pentingnya Persatuan]
+44. Wali murid dari kelas pekerja kasar datang ke loket mengenakan baju lusuh bekas bekerja. Anda mencium aroma yang kurang sedap. Sikap Front Desk Anda? A. Melayaninya dengan cepat dari jarak yang agak jauh sambil menutup hidung secara samar.B. Meminta warga tersebut untuk pulang mandi terlebih dahulu sebelum mengurus administrasi di institusi resmi.C. Menjaga ekspresi wajah tetap ramah, tidak menunjukkan gestur terganggu, dan melayaninya dengan standar yang sama persis dengan warga berdasi.D. Menyemprotkan pengharum ruangan secara terang-terangan tepat setelah warga tersebut pergi.E. Menyerahkan pelayanan warga tersebut kepada satpam yang terbiasa di lapangan. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kemampuan Berhubungan Sosial]
+45. Pimpinan sekolah meminta seluruh staf pria menggunakan peci/blangkon khas daerah pada hari perayaan HUT Kota. Anda bukan penduduk asli daerah tersebut. Sikap Anda? A. Menggunakan atribut tersebut setengah hati karena merasa itu bukan identitas budaya leluhur Anda.B. Menggunakan atribut daerah asal Anda sendiri untuk menunjukkan bahwa Indonesia beragam.C. Mengenakan atribut lokal yang diminta dengan bangga sebagai bentuk penghormatan dan asimilasi terhadap budaya tempat Anda mengabdi.D. Menolak halus dengan alasan tidak memiliki anggaran untuk membeli atribut tersebut.E. Mematuhi aturan tersebut namun mengkritik esensi kebijakannya di media sosial anonim. [Materi Pokok: Kompetensi Sosial Kultural][Kategori: Sosial Kultural - Kepekaan terhadap Pentingnya Persatuan]
+46. Jika Anda menemukan pimpinan secara tidak sengaja menandatangani dokumen persetujuan pengadaan fiktif yang disisipkan oleh oknum. Apa tindakan Anda? A. Menarik dokumen tersebut dan membuangnya ke mesin penghancur kertas agar pimpinan selamat.B. Membiarkan dokumen diproses karena itu sudah terdapat tanda tangan sah pimpinan.C. Menghadap pimpinan secara tertutup, menunjukkan bukti anomali dokumen, dan menyarankan pembatalan sebelum menjadi temuan hukum.D. Mendatangi oknum tersebut dan memintanya membatalkan dokumen itu secara sukarela.E. Menyebarkan salinan dokumen tersebut ke staf lain sebagai bahan gosip. [Materi Pokok: Wawancara][Kategori: Wawancara - Kepatuhan]
+47. Bagaimana Anda memaknai 'Loyalitas' sebagai seorang ASN/PPPK saat kebijakan instansi tidak populer di mata masyarakat? A. Bersembunyi di balik instruksi atasan dan menyalahkan pemerintah pusat jika warga komplain.B. Tetap menjalankan dan mensosialisasikan kebijakan tersebut kepada publik dengan penjelasan rasional, serta meredam gejolak penolakan.C. Membocorkan kelemahan kebijakan tersebut kepada masyarakat agar mereka maklum.D. Mengajukan pindah tugas ke instansi lain yang kebijakannya lebih mudah diterima publik.E. Menolak menjalankan kebijakan tersebut jika mayoritas warga sekitar mengancam akan demonstrasi. [Materi Pokok: Wawancara][Kategori: Wawancara - Kejujuran]
+48. Dalam evaluasi kinerja, Kepala Tata Usaha secara tidak adil memberikan nilai rendah pada Anda karena konflik personal di masa lalu. Sikap profesional Anda? A. Membalas dendam dengan menurunkan kualitas kerja Anda di bulan berikutnya.B. Menerima nilai tersebut dengan pasrah karena atasan memiliki kekuasaan penuh atas evaluasi.C. Meminta sesi diskusi objektif dengan atasan berbasis bukti hasil kerja nyata, dan memanfaatkan jalur banding kepegawaian jika diperlukan.D. Melaporkan atasan tersebut ke polisi atas tuduhan diskriminasi dan perbuatan tidak menyenangkan.E. Memprovokasi pegawai lain agar tidak mempercayai sistem penilaian atasan tersebut. [Materi Pokok: Wawancara][Kategori: Wawancara - Etika]
+49. Instansi menjanjikan fasilitas komputer baru jika Anda lolos seleksi PPPK, namun setelah bertugas 6 bulan, Anda tetap harus memakai laptop pribadi. Komitmen Anda? A. Membawa pulang laptop pribadi dan menolak mengerjakan tugas kantor hingga fasilitas turun.B. Membeli komputer kantor menggunakan uang pribadi karena dedikasi tanpa pamrih.C. Tetap bekerja maksimal menggunakan perangkat yang ada, sembari menanyakan jadwal pengadaan barang melalui prosedur perencanaan yang benar.D. Menggunakan laptop pribadi namun menagihkan biaya sewa perangkat bulanan kepada instansi.E. Sering menunda pekerjaan dan menyalahkan keterbatasan fasilitas instansi saat evaluasi. [Materi Pokok: Wawancara][Kategori: Wawancara - Komitmen]
+50. Tugas data entry seringkali minim apresiasi dan membosankan. Bagaimana cara Anda menjaga resiliensi (daya tahan) mental bekerja dalam jangka panjang? A. Sering berselancar di media sosial saat jam kantor untuk menjaga keseimbangan kesehatan mental.B. Membangun mindset bahwa akurasi data yang saya ketik berdampak krusial pada pencairan dana bantuan ribuan siswa miskin di sekolah.C. Meminta rotasi pekerjaan setiap tiga bulan sekali agar tidak merasa jenuh di satu bidang.D. Mengerjakan tugas secepat mungkin tanpa mempedulikan kesalahan ketik (typo).E. Menciptakan drama kecil di kantor agar suasana kerja harian tidak terlalu monoton. [Materi Pokok: Wawancara][Kategori: Wawancara - Komitmen]
+51. Rekan kerja Anda yang berprestasi sering pulang 2 jam lebih awal dengan cara menitipkan absen (titip absen) pada satpam. Sikap integritas Anda? A. Mengikuti cara rekan tersebut sesekali jika Anda sedang ada keperluan mendesak.B. Membiarkannya karena kinerjanya sudah sangat bagus dan melebihi target sekolah.C. Mengingatkan rekan dan satpam tersebut secara persuasif tentang risiko pemecatan, lalu melaporkan ke sistem internal jika pelanggaran berlanjut.D. Melaporkan kejadian ini langsung ke akun media sosial Badan Kepegawaian Negara.E. Meminta rekan tersebut mentraktir Anda makan siang agar rahasianya terjaga. [Materi Pokok: Wawancara][Kategori: Wawancara - Kejujuran]
+52. Anda diinstruksikan oleh panitia lokal untuk memprioritaskan pendaftaran anak dari tokoh masyarakat setempat yang menyumbang dana besar ke sekolah. Prioritas Anda? A. Mengikuti instruksi tersebut demi menjaga aliran dana masuk untuk pembangunan sekolah.B. Menolak terang-terangan di depan loket sehingga tokoh masyarakat tersebut merasa dipermalukan.C. Menolak halus, merujuk pada Permendikbud terkait juknis PPDB yang objektif, dan tetap memproses sesuai nomor antrean sistem.D. Meminta tokoh masyarakat tersebut mendaftar lewat jalur belakang pada malam hari.E. Meloloskan pendaftaran anak tokoh masyarakat tersebut, namun mempersulit proses administrasinya di kemudian hari. [Materi Pokok: Wawancara][Kategori: Wawancara - Keadilan]
+53. Keluarga Anda di rumah mengalami krisis keuangan berat, sementara di meja kerja Anda terdapat uang kas panitia yang belum disetorkan ke bank. Manajemen moral Anda? A. Meminjam uang kas tersebut sementara waktu tanpa izin, dan bertekad mengembalikannya saat gajian.B. Meminta izin kepada Kepala Sekolah untuk meminjam uang kas tersebut secara resmi.C. Sadar batas; menjaga integritas dengan tidak menyentuh uang negara sama sekali, dan mencari pinjaman ke koperasi/bank yang sah.D. Membawa uang kas tersebut pulang ke rumah agar lebih aman dari pencuri kantor.E. Menyumbangkan sebagian kecil uang kas tersebut ke panti asuhan sebagai tolak bala. [Materi Pokok: Wawancara][Kategori: Wawancara - Etika]
+54. Sebagai Operator Layanan Operasional, visi kontribusi terukur apa yang realistis Anda targetkan pada tahun pertama masa kontrak PPPK? A. Merombak total seluruh birokrasi tata usaha yang diwariskan oleh Kepala Sekolah lama.B. Menguasai penuh SOP berjalan, meminimalisir angka error dokumen hingga 0%, dan menginisiasi pengarsipan cloud yang zero-budget.C. Mendapatkan beasiswa S2 ke luar negeri dari kementerian pendidikan.D. Bekerja sesuai standar minimal (bare minimum) agar terhindar dari pemecatan.E. Mencari jabatan strategis sebagai koordinator meskipun harus menjatuhkan reputasi kolega. [Materi Pokok: Wawancara][Kategori: Wawancara - Komitmen]
+55. Instansi memutuskan memutasi Anda ke sekolah cabang di pulau terpencil yang akses jalannya sangat buruk, padahal SK Anda untuk penempatan kota. Respons Anda? A. Mengajukan surat pengunduran diri karena merasa instansi melanggar komitmen awal.B. Membuat opini publik di koran lokal bahwa instansi bertindak sewenang-wenang terhadap PPPK.C. Meminta penjelasan legalitas mutasi, dan jika prosedurnya sah sesuai UU ASN, siap berangkat demi pemerataan pelayanan kependidikan.D. Mogok kerja di kantor lama hingga SK mutasi ke pulau terpencil tersebut dibatalkan.E. Berangkat ke tempat mutasi, namun menolak melakukan pekerjaan administrasi apapun di sana. [Materi Pokok: Wawancara][Kategori: Wawancara - Kepatuhan]
+56. Penggunaan Tanda Tangan Elektronik (TTE) Tersertifikasi yang dikeluarkan oleh BSrE BSSN pada naskah dinas, secara yuridis memiliki nilai kekuatan pembuktian yang... A. Sama kuatnya dengan tanda tangan basah, asalkan dicetak di atas kertas berwarna.B. Lebih lemah dari stempel basah instansi.C. Sah dan nirsangkal (tidak dapat disangkal keasliannya) karena dienkripsi dengan kriptografi asimetris.D. Hanya berlaku untuk surat edaran internal di bawah level Eselon II.E. Wajib dilegalisir ulang oleh notaris pemerintah sebelum dikirimkan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+57. Jika surat ditujukan kepada seorang pejabat yang memiliki pimpinan (Kepala Bidang), dan pimpinan tersebut juga harus mengetahui isi suratnya tanpa perlu mengambil tindakan operasional, maka format alamat tujuan yang benar adalah... A. Yth. Kepala Seksi (Tembusan: Yth. Kepala Bidang)B. Yth. Kepala Bidang c.q. Kepala SeksiC. Yth. Kepala Seksi u.p. Kepala BidangD. Kepada Yth. Kepala Seksi a.n Kepala BidangE. Yth. Kepala Seksi dan Kepala Bidang [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+58. Penerbitan Surat Edaran dari Kepala Sekolah ke staf tata usaha pada prinsipnya tidak boleh memuat... A. Penjelasan teknis atas sebuah peraturan yang sudah ada.B. Pemberitahuan kebijakan hari libur instansi.C. Norma hukum baru yang membatalkan Peraturan Daerah.D. Imbauan untuk menghemat penggunaan listrik.E. Panduan alur presensi harian secara digital. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+59. Dalam aturan tata naskah dinas, pencantuman gelar kebangsawanan atau gelar keagamaan (seperti R.A., K.H., H.) pada alamat tujuan surat dituliskan di... A. Depan singkatan Yth.B. Di dalam tanda kurung pada akhir nama.C. Diabaikan sepenuhnya karena tidak diakui secara akademis.D. Di depan nama yang bersangkutan (setelah kata Yth.).E. Digabung dengan nomor surat. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+60. Format stempel jabatan (cap dinas) yang dibubuhkan pada dokumen yang ditandatangani oleh pejabat yang dilimpahi wewenang (a.n. atau u.b.) harus menggunakan... A. Stempel instansi pejabat yang menerima limpahan wewenang.B. Stempel khusus bertuliskan 'Atas Nama'.C. Stempel jabatan dari pejabat utama yang mendelegasikan kewenangan tersebut (Pejabat Definitif).D. Tidak perlu stempel karena hanya bersifat perwakilan.E. Stempel panitia kegiatan sekolah. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+61. Posisi yang tepat untuk pencantuman paraf hierarki (sebelum ditandatangani Kepala Sekolah) pada Surat Keputusan (SK) adalah di bagian... A. Sebelah kiri bawah pada halaman terakhir (halaman tanda tangan).B. Di bagian tengah menimpa nama Kepala Sekolah.C. Di setiap margin kanan atas pada seluruh halaman naskah.D. Pada kolom tembusan surat.E. Di halaman pertama khusus bagian 'Menimbang'. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+62. Ketentuan penulisan 'Lampiran' pada surat dinas yang berjumlah lebih dari satu dokumen dengan jenis yang berbeda-beda, ditulis dengan redaksi... A. Lampiran : Bermacam-macamB. Lampiran : 3 (tiga) berkasC. Lampiran : Ada di belakangD. Lampiran : Banyak dokumenE. Lampiran : Dirincikan di bawah [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+63. Penulisan 'Tembusan' pada akhir naskah dinas yang tidak ditujukan kepada siapapun (hanya untuk arsip pencipta surat), harus ditulis dengan... A. Tembusan: ArsipB. Tembusan: Untuk Saya SendiriC. Tembusan: SimpanD. Tembusan: KosongE. Tidak perlu mencantumkan kata 'Tembusan' sama sekali. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+64. Buku Agenda Berpasangan dalam pengelolaan surat masuk dan surat keluar digunakan dengan cara... A. Surat masuk dan surat keluar dicatat dalam satu buku besar dengan nomor urut yang menyatu.B. Halaman sebelah kiri untuk mencatat surat masuk, dan halaman sebelah kanan untuk mencatat surat keluar secara terpisah dalam satu buku.C. Dua buku yang sama persis diisi oleh dua staf yang berbeda sebagai backup.D. Surat masuk dicatat pagi hari, surat keluar dicatat sore hari.E. Menggunakan buku digital dan buku fisik secara bersamaan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+65. Dalam menyusun Berita Acara Pemusnahan Barang, elemen yang sifatnya wajib ada agar dokumen tersebut sah secara hukum administrasi adalah... A. Daftar menu konsumsi saat pemusnahan barang.B. Tanda tangan saksi minimal dua orang dari unsur pengawasan/keuangan instansi.C. Cap jempol Kepala Tata Usaha.D. Materai Rp 10.000,- pada setiap lembar lampiran.E. Foto saksi-saksi yang sedang tersenyum. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+66. Surat Perintah Tugas (SPT) dari Kepala Sekolah yang diberikan kepada Operator Layanan Operasional untuk mengikuti diklat di luar kota, berfungsi ganda sebagai dasar untuk... A. Mengajukan cuti tahunan kepada BKN.B. Mengambil alih posisi Kepala Sekolah selama diklat berlangsung.C. Penerbitan Surat Perjalanan Dinas (SPD) dan pencairan biaya akomodasi operasional.D. Menuntut promosi jabatan setelah diklat selesai.E. Merekrut pegawai honorer pengganti selama ditinggalkan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+67. Bagian 'Konsiderans' pada tata naskah Surat Keputusan (SK) terdiri dari dua sub-bagian wajib yaitu... A. Mengingat dan MemperhatikanB. Menimbang dan MemperhatikanC. Menimbang dan MengingatD. Memutuskan dan MenetapkanE. Menimbang dan Menetapkan [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+68. Untuk efisiensi penyampaian Nota Dinas di era digital, pedoman tata naskah instansi pemerintah modern menyarankan pengiriman melalui... A. Cetak warna resolusi tinggi dan dilaminating.B. Diserahkan langsung menggunakan laci antar meja tanpa amplop.C. Aplikasi Sistem Pemerintahan Berbasis Elektronik (SPBE) atau email kedinasan internal tanpa harus dicetak.D. Dikirim via ojek online agar cepat sampai di ruangan sebelah.E. Dibacakan dengan pengeras suara di lorong kantor. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Tata Naskah Dinas]
+69. Prinsip 'Asal Usul' (Principle of Provenance) dalam kearsipan mengharuskan arsiparis untuk... A. Menyusun arsip murni berdasarkan abjad nama penulisnya dari A-Z.B. Memisahkan satu dokumen menjadi beberapa bagian jika membahas dua masalah berbeda.C. Menjaga arsip tetap berada dalam kesatuan kelompok penciptanya (instansi/unit kerja), tanpa dicampurbaurkan dengan arsip instansi lain.D. Menyimpan arsip berdasarkan warna tinta cetaknya.E. Memusnahkan arsip jika unit kerja penciptanya telah dibubarkan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+70. Langkah pertama yang harus dilakukan operator saat menemukan tumpukan arsip kacau (kacau balau) di ruang tata usaha adalah... A. Memasukkannya ke dalam karung dan menjualnya ke pendaur ulang kertas.B. Membakar dokumen yang tidak memiliki stempel basah.C. Melakukan survei (identifikasi) arsip untuk mengetahui asal unit pencipta, rentang tahun, dan jenis volumenya sebelum dipilah.D. Langsung memasukkan semuanya ke dalam laci secara acak agar meja bersih.E. Menyemprotkan cairan pembunuh serangga ke seluruh permukaan dokumen secara basah. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+71. Proses 'Alih Media' arsip (Digitalisasi) dari bentuk kertas ke PDF ber-TTE tidak serta merta membuat fisik kertasnya boleh dihancurkan, KECUALI... A. Ruangan server cloud sekolah sudah dibeli secara permanen.B. Arsip fisik tersebut telah habis retensinya sesuai Jadwal Retensi Arsip (JRA) dan ada berita acara pemusnahan yang sah.C. Kepala sekolah memerintahkan pemusnahan secara lisan saat rapat.D. Kertas arsip tersebut warnanya sudah mulai menguning.E. Format PDF-nya sudah disebar ke grup WhatsApp publik. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+72. Sistem Indeks Kearsipan 'Terminal Digit' (Angka Akhir) sangat cocok digunakan untuk menyimpan dokumen bervolume raksasa seperti... A. Surat undangan rapat bulanan.B. Ijazah kelulusan siswa.C. Arsip personalia/Dossier berdasar NIP, atau rekam medis pasien di institusi kesehatan.D. Brosur iklan penawaran dari vendor swasta.E. Daftar hadir guru mingguan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+73. Nilai Guna Primer suatu arsip merujuk pada kegunaan arsip tersebut bagi... A. Peneliti sejarah dari universitas luar negeri.B. Masyarakat luas yang ingin mengetahui sejarah sekolah.C. Instansi/Unit Pencipta itu sendiri dalam kelancaran penyelenggaraan administrasi operasional harian.D. Kolektor dokumen antik untuk dilelang.E. Wartawan lokal sebagai bahan investigasi berita. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+74. Jika di dalam satu folder Snelhecter terdapat surat keputusan, surat pengantar, dan lampirannya, urutan penyimpanan yang benar adalah... A. Diurutkan secara acak asalkan tidak terlipat.B. Surat pengantar di atas (paling depan dibaca), diikuti surat keputusan, lalu lampirannya di bagian paling belakang.C. Lampirannya ditaruh paling depan agar gambar/tabelnya langsung terlihat.D. Surat keputusan di depan, surat pengantar dibuang.E. Disusun berdasarkan ukuran kertas dari yang terkecil ke yang terbesar. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+75. Sebuah Dokumen Laporan Pertanggungjawaban (LPJ) Keuangan BOS tahun 2025 dikategorikan sebagai Arsip Aktif pada tahun... A. Tahun 2035B. Tahun berjalan (2025) hingga selesai proses audit oleh BPK/Inspektorat.C. Tahun 2020D. Selamanya tidak pernah berubah status.E. Tepat sehari setelah diserahkan ke Dinas Pendidikan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+76. Pada sistem penyimpanan arsip Subjek (Pokok Masalah), kode klasifikasi 'KP' umumnya mewakili kelompok masalah... A. Keuangan PemdaB. Kearsipan PermanenC. KepegawaianD. Kepala PerwakilanE. Kerja Praktik [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+77. Fungsi pemasangan Out Guide (Lembar Keluar) berupa karton tebal di dalam laci filling cabinet adalah untuk... A. Menahan dokumen agar tidak terjatuh saat laci ditarik.B. Sebagai tanda pemisah (subtitusi) bahwa dokumen asli yang ada di posisi tersebut sedang dipinjam oleh pihak lain.C. Mencegah serangan rayap tanah memakan kertas.D. Menandai batas kapasitas maksimal kertas dalam satu laci.E. Sebagai pembatas untuk memisahkan kertas surat dan kertas koran. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+78. Penanganan arsip statis (arsip sejarah) sekolah, seperti Akta Pendirian Sekolah Rakyat tahun 1950, wajib diserahkan kepada... A. Kepala Desa setempat untuk disimpan di balai desa.B. Lembaga Kearsipan Daerah (ANRI Daerah / Dinas Kearsipan Provinsi/Kabupaten/Kota) sebagai memori kolektif bangsa.C. Museum swasta nasional yang berani membayar mahal.D. Diwariskan ke keturunan kepala sekolah yang menjabat saat itu.E. Dimusnahkan karena kertasnya sudah sangat lapuk. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+79. Asesmen 'Penyusutan Arsip' dilakukan melalui 3 (tiga) cara utama, yaitu... A. Pemindahan, Penyerahan, dan Pemusnahan.B. Pencatatan, Perekaman, dan Penggandaan.C. Pencucian, Pelapisan plastik, dan Penjemuran.D. Penjualan, Pelelangan, dan Penghibahan.E. Pembakaran, Penguburan, dan Penenggelaman. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+80. Untuk menjaga keamanan Arsip Vital (misal: Sertifikat Tanah Sekolah) dari kerusakan, prosedur perlindungan yang diterapkan adalah... A. Menyimpannya di dalam tas pribadi Kepala Sekolah yang dibawa ke mana-mana.B. Mendistribusikan fotokopinya ke seluruh guru sebagai cadangan.C. Menyimpannya di Brankas Tahan Api (Fireproof Safe) dan membuat salinan TTE di lokasi server terpisah (Off-site backup).D. Menitipkan dokumen aslinya ke bank swasta terdekat tanpa perjanjian dinas.E. Membingkainya dan memajangnya di dinding lobi depan sekolah. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+81. Ketika menggunakan Kartu Kendali dalam sistem pencatatan persuratan dinamis, indeks kartu tersebut disusun berdasarkan... A. Warna amplop surat saat diterima.B. Nama kurir atau staf pos yang mengantarkannya.C. Subjek masalah surat, kode klasifikasi, atau abjad pengirim surat.D. Bulan lahir penerima surat.E. Jumlah halaman surat tersebut. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Manajemen Kearsipan]
+82. Berdasarkan UU No. 25 Tahun 2009 tentang Pelayanan Publik, sekolah negeri sebagai penyelenggara layanan diwajibkan menyusun 'Standar Pelayanan'. Komponen wajib di dalamnya meliputi... A. Syarat administrasi, prosedur kerja (SOP), waktu penyelesaian, biaya/tarif, dan spesifikasi produk layanan.B. Daftar menu makanan kantin sekolah dan harga seragam olahraga tahunan.C. Nomor HP pribadi seluruh guru pengajar dan staf tata usaha.D. Daftar nama alumni sekolah yang sukses menjadi pejabat daerah.E. Laporan pengeluaran uang saku harian siswa. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+83. Jika sistem pembuatan legalisir ijazah online sekolah mengalami crash (gangguan fatal) dan estimasi perbaikannya memakan waktu 3 hari, asas 'Kepastian Layanan' menuntut operator untuk... A. Menggantung status permohonan hingga sistem menyala sendiri.B. Mengaktifkan kanal layanan manual darurat sementara (Business Continuity Plan), dan mengumumkan status gangguan secara transparan.C. Meminta pemohon melegalisir ijazahnya di sekolah terdekat yang jaringannya lancar.D. Mengubah regulasi agar legalisir tidak diperlukan lagi oleh instansi.E. Menghapus data pemohon agar mereka mendaftar ulang minggu depan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+84. Maklumat Pelayanan yang dipajang di ruang tata usaha merupakan... A. Papan nama selamat datang bagi para tamu kehormatan.B. Pernyataan sepihak dari masyarakat yang menuntut pelayanan prima.C. Dokumen janji tertulis/komitmen dari instansi penyelenggara layanan untuk memberikan layanan sesuai standar yang dipublikasikan.D. Daftar sanksi pidana bagi warga yang berbuat keributan di sekolah.E. Laporan audit keuangan dari Badan Pemeriksa Keuangan (BPK). [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+85. Prinsip 'Non-Diskriminatif' dalam layanan penerimaan mutasi siswa diwujudkan dengan... A. Memisahkan jalur layanan pendaftaran berdasarkan tingkat sumbangan orang tua.B. Memberikan layanan dengan standar baku yang sama tanpa membedakan status sosial, suku, ras, agama, maupun tingkat ekonomi pemohon.C. Memilih siswa yang memiliki penampilan fisik yang paling rapi untuk dilayani pertama.D. Memprioritaskan siswa yang berasal dari keluarga pegawai instansi pemerintahan saja.E. Hanya melayani warga yang bertempat tinggal di radius 1 kilometer dari gerbang sekolah. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+86. Jika Indeks Kepuasan Masyarakat (IKM) pada unsur 'Kompetensi Pelaksana' mendapat nilai terendah (kategori C-Kurang Baik), langkah perbaikan manajerial yang tepat adalah... A. Mengganti seluruh meja kursi dan mengecat ulang ruang tunggu pelayanan.B. Menurunkan tarif layanan pendaftaran sekolah agar masyarakat puas.C. Melakukan In-House Training teknis atau diklat Service Excellence khusus bagi petugas loket (front office).D. Meniadakan kolom pengisian unsur 'Kompetensi Pelaksana' pada survei IKM periode berikutnya.E. Melaporkan masyarakat ke polisi karena memberikan nilai jelek kepada instansi. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+87. Tindakan staf administrasi yang dengan sengaja memperlambat proses pembuatan Surat Keterangan Pindah Siswa (padahal berkas lengkap) dengan harapan agar wali murid memberikan 'uang pelicin', masuk ke dalam bentuk penyimpangan pelayanan publik berupa... A. NepotismeB. Maladministrasi jenis Penundaan Berlarut (Undue Delay) dan indikasi Pungli.C. Efisiensi Biaya OperasionalD. Gratifikasi LegalE. Diskresi Otoritas Pimpinan [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+88. Dalam menyusun alur pelayanan (Bagan Alur) di instansi, prinsip utama agar alur tersebut efektif bagi publik adalah... A. Dibuat sekompleks mungkin agar instansi terlihat profesional dan berwibawa.B. Ditulis menggunakan bahasa hukum murni yang disalin langsung dari Undang-Undang.C. Mudah dibaca, informatif (memuat urutan langkah yang jelas), dan dipasang pada tempat yang mudah dilihat oleh pemohon layanan.D. Disembunyikan di ruang kepala sekolah untuk menjaga kerahasiaan prosedur negara.E. Digambar dengan tulisan tangan menggunakan pensil agar mudah dihapus sewaktu-waktu. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+89. Untuk mewujudkan pelayanan ramah kelompok rentan (Inklusif) di sekolah, penyediaan loket khusus (Fast Track) diutamakan untuk... A. Pejabat daerah dan keluarga guru.B. Siswa berprestasi akademik pemenang olimpiade.C. Lansia, ibu hamil, penyandang disabilitas, dan warga yang membawa balita.D. Donatur terbesar pembangunan masjid sekolah.E. Siswa yang sering membolos sekolah. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+90. Saat melayani keluhan/pengaduan masyarakat, metode SP4N-LAPOR! mengamanatkan instansi untuk menindaklanjuti laporan yang masuk maksimal dalam waktu... A. 1 tahun anggaran berjalan.B. 14 hari kerja untuk verifikasi dan penyelesaian awal pengaduan standar.C. 1 jam setelah warga menekan tombol lapor di aplikasi.D. Tidak ada batas waktu, diselesaikan jika staf sedang tidak sibuk.E. 60 hari berturut-turut tanpa hari libur. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+91. Penyediaan fasilitas Front Office di instansi modern dirancang dengan desain meja yang tidak terlalu tinggi dan tanpa kaca penyekat tebal (kecuali area kasir), bertujuan untuk... A. Memudahkan staf menyeberang meja jika ingin istirahat.B. Membangun komunikasi yang lebih hangat, setara (eye-level), dan memecah hambatan fisik (Barrier) birokrasi antara aparat dan masyarakat.C. Menghemat anggaran pembelian bahan baku kaca tebal.D. Menunjukkan bahwa staf TU tidak takut tertular penyakit dari warga.E. Memudahkan warga jika ingin memberikan tip uang ke dalam laci secara diam-diam. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+92. Inovasi 'Pelayanan Jemput Bola' di lingkungan sekolah dapat diimplementasikan dalam bentuk... A. Siswa dihukum menjemput bola sepak dari lapangan sebelum diberikan surat izin masuk kelas.B. Operator tata usaha menunggu di mejanya sampai siswa lulus dan mengambil ijazahnya sendiri 5 tahun kemudian.C. Petugas TU mendatangi langsung kelompok masyarakat/kelas tertentu untuk proses pendataan kolektif KIP (Kartu Indonesia Pintar) tanpa menyuruh mereka antre panjang di kantor.D. Menjemput kepala sekolah menggunakan mobil dinas setiap pagi dari rumahnya.E. Membatalkan pendaftaran bagi siswa yang tinggal jauh dari lokasi sekolah. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+93. Jika instansi merubah jam buka layanan dari pukul 08.00 WIB menjadi pukul 07.30 WIB untuk mengakomodir orang tua pekerja, tindakan administratif awal yang wajib dilakukan adalah... A. Langsung menerapkan jam baru esok harinya tanpa memberitahu siapapun agar menjadi kejutan.B. Melakukan sosialisasi perubahan jam layanan secara masif melalui media sosial sekolah, surat edaran, dan papan pengumuman di gerbang.C. Memotong gaji staf tata usaha karena harus berangkat 30 menit lebih awal.D. Mengunci pagar sekolah agar orang tua yang datang jam 08.00 pagi tidak bisa masuk.E. Menuntut pemerintah daerah memberikan insentif tambahan secara lisan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+94. Berdasarkan evaluasi Ombudsman, seringnya warga 'bolak-balik' (pulang pergi) ke sekolah hanya untuk melengkapi berkas legalisir disebabkan oleh kegagalan penerapan asas... A. Keramahan dan Kesopanan StafB. Keamanan Gedung InstansiC. Keterbukaan Informasi (Persyaratan Administrasi yang tidak diumumkan secara jelas di awal).D. Ketersediaan Lahan Parkir PublikE. Kecepatan Waktu Pengetikan [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Standar Pelayanan Publik]
+95. Dalam menangani incoming call (telepon masuk) yang bernada tinggi akibat kesalahan sistem penerimaan siswa baru, teknik paralanguage (pengaturan vokal) yang tepat dari operator adalah... A. Menyamakan nada suara tinggi dengan penelepon untuk mendominasi percakapan.B. Berbicara dengan kecepatan sangat cepat agar percakapan segera selesai.C. Menjaga nada suara (pitch) tetap rendah, ritme bicara stabil, dan tidak memotong kalimat (interupsi) penelepon yang sedang meluapkan emosi.D. Berbisik-bisik agar penelepon kesulitan mendengar dan akhirnya menutup telepon.E. Menirukan logat penelepon untuk menjadikannya bahan candaan di telepon. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+96. Metode 'Active Listening' saat Anda menerima instruksi lisan dari Kepala Tata Usaha ditunjukkan melalui respon fisik berupa... A. Mata menatap layar monitor komputer secara terus-menerus tanpa berkedip.B. Postur tubuh condong ke belakang (menyandar rileks) dengan tangan bersidekap.C. Kontak mata proporsional, sedikit mengangguk, mencatat kata kunci, dan memberikan konfirmasi pemahaman (paraphrase) di akhir instruksi.D. Menginterupsi setiap lima detik untuk mengoreksi tata bahasa atasan.E. Mengerutkan dahi tajam untuk menunjukkan kebingungan yang mendalam. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+97. Gaya komunikasi 'Asertif' di lingkungan kerja paling tepat digambarkan saat Anda dihadapkan pada pendelegasian tugas yang berlebihan dari rekan sejawat. Anda akan berkata... A. 'Tugasmu kerjakan sendiri, dasar pemalas!' (Agresif)B. 'Baik, saya akan kerjakan tugas ini, tidak apa-apa saya lembur lagi.' (Pasif)C. 'Saya memahami ini mendesak, namun saat ini saya harus menuntaskan laporan target bulanan kita. Saya bisa bantu sebagian besok pagi setelah laporan ini selesai.' (Asertif)D. 'Terserah saja, letakkan di meja, entah kapan saya mengerjakannya.' (Pasif-Agresif)E. 'Apakah saya terlihat seperti pembantumu?' (Sarkastik) [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+98. Bila pesan di grup WhatsApp internal dinas sering disalahpahami (miskomunikasi) karena ketiadaan konteks nada suara, strategi pencegahan yang efektif sebagai operator informasi adalah... A. Menggunakan huruf kapital (HURUF BESAR) di seluruh pesan penting agar terlihat berwibawa.B. Selalu menggunakan pesan suara (Voice Note) untuk semua hal, termasuk membagikan tabel angka.C. Menyusun pesan dengan struktur poin-poin yang jelas, menggunakan diksi netral/formal, dan menghindari ambiguitas atau bahasa sarkas tertulis.D. Memblokir fitur balasan (Only Admin Can Post) selamanya agar tidak ada perdebatan sama sekali.E. Menyisipkan stiker menangis di setiap akhir kalimat pengumuman. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+99. Notula (Risalah Rapat) dinilai berkualitas baik apabila disusun berdasarkan prinsip 'Action Oriented' (Berorientasi Tindakan), yang artinya... A. Mencatat setiap kata sambutan dan doa pembuka secara verbatim (kata per kata).B. Mencantumkan seluruh menu makanan ringan yang disajikan selama rapat dewan guru.C. Secara jelas merangkum kesimpulan keputusan, memuat tabel penanggung jawab tugas (Person in Charge), dan tenggat waktu (Deadline) eksekusinya.D. Hanya memuat opini-opini subjektif dari notulis mengenai peserta yang hadir.E. Ditulis menggunakan bahasa asing agar terlihat sebagai instansi kelas dunia. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+100. Etika penyusunan Subject Line (Judul Email) saat mengirimkan draf Rencana Kerja Anggaran Sekolah (RKAS) kepada Dinas Pendidikan adalah... A. Dikosongkan agar penerima penasaran dan segera membukanya.B. Ditulis: 'PENTING SEKALI BACA SEKARANG !!!' (Huruf kapital semua).C. Ditulis padat dan jelas mencerminkan isi dan identitas: 'Draf RKAS 2026 - SD Negeri 1 Sekolah Rakyat'.D. Ditulis menyerupai kalimat sapaan: 'Halo Bapak/Ibu Dinas, semoga sehat selalu, ini laporannya ya.'E. Hanya menyalin ulang (Copy-Paste) seluruh paragraf pertama dari isi email ke dalam baris subjek. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+101. Komunikasi krisis (Crisis Communication) saat terjadi musibah keracunan makanan ringan massal pada siswa sekolah membutuhkan Holding Statement (Pernyataan Tunggu) dari pihak humas tata usaha, yang berbunyi... A. 'Ini sepenuhnya salah pedagang kantin, silakan tuntut mereka.'B. 'Tidak terjadi apa-apa, murid-murid hanya masuk angin biasa.'C. 'Kami membenarkan adanya insiden tersebut. Saat ini pihak sekolah sedang fokus menangani medis siswa dan berkoordinasi dengan Puskesmas/Polisi. Informasi valid lanjutan akan dirilis pkl 15.00.'D. 'Mungkin ini kutukan karena komite sekolah jarang beramal.'E. 'Silakan wawancara langsung siswa yang sakit di ruang UGD.' [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+102. Hambatan Semantik (Semantic Barrier) dalam pelayanan kepada warga pelosok desa yang mengurus KIP (Kartu Indonesia Pintar) dapat diminimalisir dengan cara... A. Memperkeras volume suara mikrofon agar mereka mendengar perintah operator.B. Menyuruh mereka kursus bahasa Indonesia baku sebelum datang ke sekolah.C. Menyederhanakan terminologi birokrasi (contoh: 'Validasi NIK Dukcapil' diubah menjadi 'Pengecekan Nomor KTP di Kantor Kelurahan') agar pesannya setara (frame of reference).D. Memberikan surat edaran bahasa Inggris yang diterjemahkan langsung dari Google Translate.E. Mengabaikan mereka karena dianggap menghambat kecepatan antrean masyarakat kota. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+103. Dalam memberikan penolakan terhadap peminjam fasilitas aula sekolah dari pihak luar karena jadwal yang sudah penuh, struktur kalimat 'Sandwich Technique' (Positif-Negatif-Positif) yang benar adalah... A. 'Aula sudah dipesan! Kami tidak bisa menerima Anda lagi. Silakan cari tempat lain!'B. 'Terima kasih atas minat Bapak/Ibu menggunakan aula kami. Mohon maaf, untuk tanggal tersebut jadwalnya sudah fully booked oleh kegiatan siswa. Kami persilakan memesan untuk tanggal di bulan berikutnya.'C. 'Kami rasa Anda terlambat memesan. Tapi tidak apa-apa, kami akan batalkan acara siswa demi Anda.'D. 'Tentu saja boleh dipinjam. Namun Anda harus membayar sewa tiga kali lipat. Setuju?'E. 'Aula kami terlalu bagus untuk acara Anda. Mohon cari tempat yang standar saja.' [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+104. Saat Kepala Sekolah meminta Anda menyiapkan ruang presentasi (Audiovisual) untuk memaparkan profil sekolah kepada asesor akreditasi. Fokus persiapan teknis komunikasi Anda adalah memastikan... A. Penyediaan mikrofon karaoke dengan efek gema yang sangat tinggi.B. Ketersediaan banyak proyektor di ruangan meskipun hanya 1 asesor yang datang.C. Kejelasan tampilan proyektor (brightness/contrast), stabilitas koneksi internet untuk data cloud, dan alat pointer/clicker berfungsi normal.D. Memutar musik dangdut koplo yang keras untuk menyambut asesor dari luar kota.E. Menyemprotkan pewangi ruangan sebanyak-banyaknya hingga menimbulkan kabut. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+105. Penggunaan Blind Carbon Copy (BCC) dalam email balasan massal kepada 500 pendaftar PPDB yang tidak lolos seleksi bertujuan utama untuk... A. Menutupi alamat email atasan dari pengawasan kementerian.B. Membuat file lampiran email tidak bisa didownload oleh penerima.C. Menjaga kerahasiaan (Privacy/Data Protection) alamat email masing-masing pendaftar agar tidak saling terlihat dan disalahgunakan untuk spam.D. Mengubah tulisan email menjadi rahasia (enkripsi password otomatis).E. Memastikan email langsung terhapus setelah 5 menit dibaca oleh peserta. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+106. Proses 'Filtering' (Penyaringan Pesan) dalam birokrasi internal terjadi ketika... A. Operator tata usaha menyortir amplop berdasarkan ukuran kertasnya.B. Mengurangi kadar gula pada teh yang disajikan saat rapat dinas.C. Bawahan dengan sengaja memanipulasi informasi (hanya menyampaikan yang baik-baik saja) agar atasan merasa senang, yang justru berpotensi merusak keputusan strategis.D. Memasang aplikasi anti-virus pada server email sekolah.E. Memblokir nomor HP wali murid yang sering komplain via WhatsApp. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+107. Ketika rapat koordinasi jarak jauh (Video Conference / Zoom), etika komunikasi digital yang lazim (Netiquette) jika Anda sedang tidak berbicara adalah... A. Mematikan layar (Turn Off Camera) dan tidur di depan laptop.B. Menghidupkan mikrofon (Unmute) sambil makan kerupuk yang berbunyi keras.C. Mematikan mikrofon (Mute) untuk menghindari kebocoran (noise) suara latar dari ruangan Anda yang dapat mengganggu pembicara utama.D. Secara aktif mengirim tautan jualan produk pribadi di kolom chat box.E. Berteriak memanggil anggota keluarga Anda di rumah tanpa mematikan mikrofon. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Komunikasi Perkantoran]
+108. Jika Anda mengunduh data Nomor HP dari sistem Dapodik berformat CSV, lalu membukanya di Ms. Excel, angka '0' di depan sering menghilang dan formatnya menjadi notasi ilmiah (misal: 8.12E+10). Cara impor data (Data Import) yang benar untuk mencegahnya adalah... A. Mewarnai cell menjadi merah sebelum melakukan copy-paste.B. Menghapus angka 8 di depan agar menjadi angka acak yang teratur.C. Menggunakan fitur Data -> From Text/CSV, lalu pada jendela wizard/transform, mengubah tipe data kolom HP dari 'General' menjadi 'Text'.D. Menambahkan huruf 'X' di depan semua nomor telepon setelah diimpor.E. Menyimpan ulang file dalam format Microsoft Word lalu di-copy kembali ke Excel. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+109. Untuk menyusun ribuan sertifikat penghargaan seminar guru secara otomatis (memasukkan Nama, NIP, dan Instansi dari file Excel ke template Ms. Word), fitur spesifik yang wajib dikuasai TENDIK adalah... A. Track Changes & Reviewing PaneB. Macro VBA Excel ProgrammingC. Mailings -> Mail Merge (Step-by-Step Wizard atau Select Recipients).D. Insert -> SmartArt HierarchyE. References -> Table of Authorities [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+110. Dalam sebuah tabel Excel berisi daftar umur pensiun pegawai sekolah, rumus fungsi logika yang tepat untuk memunculkan teks 'PENSIUN' jika umur (sel C2) >= 60, dan 'AKTIF' jika < 60 adalah... A. =VLOOKUP(C2, 60, "PENSIUN", "AKTIF")B. =COUNTIF(C2>=60; PENSIUN; AKTIF)C. =IF(C2>=60; "PENSIUN"; "AKTIF")D. =SUMIF(C2, ">=60", PENSIUN)E. =MATCH(C2; 60; "PENSIUN") [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+111. Ketika merekap nilai rapor di Excel, fungsi \`=AVERAGE(B2:B10)\` digunakan untuk mencari... A. Nilai siswa yang paling sering muncul dalam kelompok.B. Total jumlah keseluruhan nilai siswa pada rentang tersebut.C. Nilai rata-rata (Mean) dari kumpulan angka siswa pada rentang B2 sampai B10.D. Nilai tengah (Median) dari distribusi angka siswa yang diurutkan.E. Nilai paling tinggi dan nilai paling rendah dalam satu kelas. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+112. Untuk mengamankan dokumen Spreadsheet absensi online berbasis Google Sheets agar guru hanya bisa mencentang kotak 'Hadir/Alfa', tanpa bisa menghapus atau mengubah formula rekapitulasi, fitur pembatasan hak akses yang digunakan adalah... A. Download as PDF file format.B. Membagikan tautan dengan status Viewer (Pelihat) murni tanpa opsi edit.C. Fitur Protect Range/Sheet (Lindungi Rentang), menyetel izin modifikasi cell rumus hanya untuk Pemilik (Only You/Owner).D. Menghapus akun Google seluruh guru.E. Mengubah warna font rumus menjadi warna putih (Invisible Text). [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+113. Anda sedang mengetik draf laporan panjang di Ms. Word. Tiba-tiba aliran listrik putus sebelum Anda sempat melakukan 'Save' (Ctrl+S). Jika fitur AutoRecover bawaan Microsoft Office aktif, dokumen tersebut... A. Hilang selamanya tanpa jejak karena murni kesalahan PLN.B. Otomatis dikirim ke email Kepala Sekolah melalui jalur internet cadangan.C. Umumnya dapat dipulihkan (Document Recovery Pane) pada status autosave terakhir (biasanya per 10 menit), saat aplikasi Word dibuka kembali.D. Hanya menyisakan halaman judul dan daftar isi yang secara default tersimpan di BIOS komputer.E. Berubah format menjadi huruf mesin (Binary Code) yang tidak bisa dibaca manusia. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+114. Dalam membuat slide presentasi PowerPoint profil sekolah untuk ditayangkan secara berulang otomatis (Looping) di lobi tata usaha tanpa operator, setelan yang dicentang pada menu 'Set Up Slide Show' adalah... A. Presented by a speaker (full screen)B. Show without animationC. Loop continuously until 'Esc'D. Disable hardware graphics accelerationE. Record Narration timing [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+115. Sebuah dokumen arsip fisik berupa pas foto siswa hasil scan terlihat terlalu gelap dan miring orientasinya. Manipulasi pengeditan dasar (Cropping & Brightness/Contrast Adjustment) sebelum disimpan dalam database, lazimnya dapat dilakukan tanpa aplikasi desain mahal, cukup menggunakan alat bawaan Windows, yaitu... A. Command Prompt (CMD)B. Microsoft Access DatabaseC. Photos App, Paint, atau Picture Format langsung dari dalam Microsoft Word/PowerPoint.D. Notepad Text EditorE. Task Manager Performance Tab [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+116. Fitur 'Find and Replace' (Shortcut: Ctrl + H) di Microsoft Word dapat menghemat waktu operator ratusan menit. Fungsinya adalah... A. Mencari font berukuran 12 dan menggantinya dengan font berukuran 24 secara manual.B. Mengganti posisi gambar dari sebelah kanan ke sebelah kiri teks (Text Wrapping).C. Mencari kata/kalimat tertentu (misal: 'SDN 1 Sekolah Rakyat') dan menggantinya secara massal otomatis dengan kata lain (misal: 'UPTD SDN 1 Sekolah Rakyat') di seluruh bagian naskah dinas.D. Mencari file dokumen yang hilang di komputer dan menggantinya dengan file baru dari internet.E. Mencari shortcut keyboard yang rusak dan memulihkannya kembali. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+117. Kapasitas penyimpanan Google Drive (akun non-premium) akan cepat penuh jika tidak dikelola. Metode 'Decluttering' file yang paling banyak membebaskan ruang tanpa merusak sistem adalah... A. Menghapus semua file ekstensi .TXT berukuran 1 KB.B. Mengganti nama seluruh folder menjadi lebih pendek.C. Mencari dan menghapus file video (MP4) rekaman kegiatan lama yang berukuran raksasa, atau mengosongkan folder 'Trash/Bin' secara permanen.D. Memindahkan file-file besar ke dalam satu folder 'Rahasia' di dalam Google Drive itu sendiri.E. Mengubah warna folder Google Drive dari warna abu-abu menjadi merah terang. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+118. Keamanan data (Cyber Security) di sekolah mewajibkan operator menjaga kerahasiaan sandi Dapodik. Praktek password management yang terburuk dan sangat dilarang adalah... A. Mengganti password secara periodik 3 bulan sekali.B. Menggunakan kombinasi huruf besar, kecil, angka, dan simbol (Alfanumerik).C. Menuliskan username dan password di secarik kertas 'Post-it' kuning, lalu menempelkannya dengan jelas di tepi monitor komputer pelayanan.D. Menyalakan Autentikasi Dua Langkah (2FA) menggunakan SMS OTP ke nomor HP pribadi operator.E. Memiliki password unik yang berbeda untuk email, Dapodik, dan e-Katalog. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+119. Dalam menyusun Google Form pendataan alumni, terdapat fitur untuk membatasi agar satu orang (satu email) hanya boleh mengisi form tersebut sebanyak satu kali (mencegah double data/spam). Opsi yang harus diaktifkan pada pengaturan form adalah... A. Collect email addresses: Responder inputB. Make this a quizC. Limit to 1 response (Memerlukan sign-in Google)D. Allow responders to edit after submitE. Show progress bar in presentation menu [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+120. Shortcut untuk membatalkan proses terakhir yang tidak sengaja dilakukan (misal: terhapusnya tabel data di Word) secara instant adalah menekan tombol... A. Ctrl + Y (Redo)B. Alt + F4 (Task Manager)C. Ctrl + Z (Undo)D. Windows Key + L (Lock Screen)E. Shift + Delete (Permanent Delete) [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengoperasian Perangkat Lunak Perkantoran]
+121. Jika seorang pegawai TENDIK (PNS/PPPK) dijatuhi Hukuman Disiplin Tingkat Sedang (berupa Penurunan Jabatan setingkat lebih rendah) berdasarkan PP 94 Tahun 2021, maka hal tersebut pasti akan berdampak menunda diberikannya hak pegawai, yaitu... A. Penundaan waktu istirahat siang pegawai tersebut.B. Pemotongan iuran jaminan kesehatan BPJS.C. Penundaan Kenaikan Gaji Berkala (KGB) dan Kenaikan Pangkat selama masa hukuman disiplin berjalan.D. Pencabutan status kewarganegaraan Indonesia.E. Penghapusan nomor induk kependudukan di Dukcapil daerah setempat. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+122. Penyusunan SKP (Sasaran Kinerja Pegawai) modern melalui aplikasi e-Kinerja BKN menganut prinsip 'Cascading' (Penjenjangan Kinerja). Makna hierarkis operasionalnya adalah... A. SKP pegawai bawahan (TENDIK) disusun murni berdasarkan karangan pribadi tanpa melihat tujuan instansi.B. Kinerja kepala sekolah tidak memiliki hubungan sama sekali dengan kinerja tenaga kependidikan di bawahnya.C. Rencana hasil kerja (RHK) atasan langsung diintervensi (di-breakdown/diturunkan) menjadi rencana hasil kerja staf pelaksana agar target indikator organisasi saling selaras dan tercapai.D. Nilai kinerja hanya diukur dari banyaknya jumlah fotokopi kertas yang dihasilkan dalam setahun.E. SKP atasan diubah oleh bawahan jika atasan tidak masuk kerja. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+123. Buku Penjagaan KGB (Kenaikan Gaji Berkala) di Tata Usaha memegang peranan krusial bagi kesejahteraan pegawai. Fungsi sistem penjagaan (trigger system) dalam buku tersebut adalah untuk mengingatkan operator agar... A. Menaikkan gaji pegawai secara sepihak dari kas komite sekolah.B. Memberhentikan pegawai yang usianya sudah terlalu tua secara sepihak.C. Memproses usulan dan mencetak SK KGB paling lambat 2 (dua) bulan sebelum TMT (Terhitung Mulai Tanggal) KGB seorang pegawai jatuh tempo (setiap kelipatan 2 tahun masa kerja).D. Menahan KGB pegawai yang memiliki konflik personal dengan Kepala TU meskipun kinerjanya baik.E. Mengingatkan pegawai untuk patungan membayar tagihan listrik kantor. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+124. Aparatur Sipil Negara (PNS/PPPK) berhak atas Cuti Alasan Penting. Kondisi darurat mana di bawah ini yang secara hukum kepegawaian sah menjadi landasan pengajuan jenis cuti tersebut? A. Hewan peliharaan kesayangan mati mendadak.B. Mobil pribadi pegawai sedang diservis di bengkel luar kota.C. Ibu kandung atau mertua pegawai sakit keras (rawat inap) yang dibuktikan dengan surat keterangan rumah sakit.D. Pegawai ingin menonton konser musik band idolanya di Jakarta.E. Pegawai sedang merenovasi dapur rumah pribadinya. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+125. Dalam pencatatan 'Buku Induk Pegawai' sekolah, dokumen dasar (source document) yang wajib menjadi rujukan untuk mengisi form kolom identitas riwayat kepangkatan pertama kali masuk adalah... A. Kuitansi pembayaran seragam KORPRI saat pertama kali mendaftar.B. Surat Keterangan Lulus dari universitas yang dilegalisir basah.C. SK Pengangkatan CPNS / SK Pengangkatan PPPK Pertama (SK 80% / 100%) dan SPMT (Surat Pernyataan Melaksanakan Tugas).D. Brosur penerimaan CASN BKN tahun tersebut.E. Kartu BPJS Ketenagakerjaan pegawai. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+126. Batas Usia Pensiun (BUP) bagi Pejabat Pelaksana (Jabatan Fungsional Umum/TENDIK) berdasarkan regulasi manajemen ASN terbaru adalah... A. 50 TahunB. 55 TahunC. 58 TahunD. 60 TahunE. 65 Tahun [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+127. Mekanisme Pembinaan Pegawai (TENDIK) yang sering terlambat (mangkir) masuk kerja didasarkan pada akumulasi waktu. Jika dihitung komulatif dalam 1 tahun mencapai 28 hari kerja atau lebih tanpa alasan sah, maka sanksi yang membayangi adalah... A. Teguran lisan dari satpam sekolah.B. Diwajibkan mengepel seluruh lantai sekolah selama sebulan penuh.C. Pemberhentian Dengan Hormat Tidak Atas Permintaan Sendiri (Pemecatan) karena melanggar hukuman disiplin tingkat berat.D. Hanya dipotong gaji dan dibiarkan masuk kerja seperti biasa.E. Dipindahkan tugasnya menjadi penjaga perpustakaan daerah. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+128. Aplikasi pembaruan data mandiri kepegawaian MyASN (sebelumnya MySAPK) BKN mengharuskan setiap pegawai, termasuk Operator Layanan, memutakhirkan data secara mandiri (Self-Service). Dampak fatal jika operator malas meng-update Riwayat Pendidikan S1 terbarunya di aplikasi ini adalah... A. Aplikasi akan otomatis terhapus dari ponsel pribadinya.B. Gelar S1 tersebut tidak akan diakui secara akademis oleh masyarakat.C. Ijazah S1 tidak tercatat di database BKN pusat, sehingga tertolak saat mengusulkan penyesuaian ijazah (Pencantuman Gelar) untuk perhitungan jenjang karir masa depan.D. Pihak kampus akan menarik kembali ijazah tersebut.E. BKN akan mendenda pegawai tersebut sebesar puluhan juta rupiah. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+129. Syarat administrasi mutlak untuk mendaftarkan Tunjangan Suami/Istri (Tunjangan Keluarga 10% dari Gaji Pokok) ke KP4 Dinas Pendidikan adalah menyertakan fotokopi legalisir... A. KTP Ketua RT tempat resepsi pernikahan dilangsungkan.B. Foto pre-wedding di studio foto resmi.C. Buku Nikah / Akta Perkawinan Catatan Sipil yang sah dari KUA/Dukcapil.D. Surat cinta pertama saat masa pendekatan (PDKT).E. Kuitansi biaya penyelenggaraan pesta pernikahan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+130. Bagi TENDIK berstatus PPPK, jenis perlindungan/jaminan masa depan yang skemanya membedakan mereka secara fundamental dengan PNS konvensional (berdasarkan aturan pra-UU No 20/2023) terletak pada sistem... A. Gaji pokok bulanan yang diterima secara nominal sangat berbeda.B. Hak atas Cuti Tahunan yang tidak didapatkan oleh PPPK.C. Jaminan Pensiun (THT Tua) yang skema iurannya (Iuran Pasti) masih bergantung pada produk asuransi BPJS TK/Taspen DPLK, bukan pensiun bulanan seumur hidup APBN murni.D. Kewajiban mengenakan seragam dinas harian (PDH) warna putih krem.E. Jam kerja yang lebih lama 2 jam dibandingkan PNS. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+131. Dokumen DUK (Daftar Urut Kepangkatan) disusun setiap tahun. Jika terdapat 2 orang pegawai (A dan B) yang Golongan Ruangnya sama (misal: II/c), maka penentuan urutan kepangkatan (siapa yang ditaruh di urutan atas) selanjutnya didasarkan pada variabel... A. Siapa yang ukuran badannya lebih tinggi.B. Jumlah anak yang dimiliki masing-masing.C. TMT (Terhitung Mulai Tanggal) Pangkat/Golongan yang lebih lama. Jika masih sama, dilihat jabatan, masa kerja, diklat, pendidikan, dan usia tertua.D. Hasil undian (Kocok Arisan) di depan Kepala Sekolah.E. Jarak tempuh rumah terdekat ke lokasi sekolah. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+132. Pada cuti sakit melebihi 1 hari hingga 14 hari, dokumen mutlak yang melandasi keabsahan cuti tersebut agar absen tidak dinyatakan merah (Alfa) adalah... A. Surat pernyataan sakit yang ditulis sendiri tanpa meterai.B. Surat keterangan sakit dari tetangga terdekat.C. Surat Keterangan Dokter (pemerintah/Puskesmas/klinik faskes BPJS resmi) yang mencantumkan masa istirahat.D. Pesan singkat WhatsApp kepada Kepala Sekolah tanpa bukti medis.E. Bukti struk pembelian obat ringan dari warung terdekat. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+133. Istilah mutasi pindah wilayah kerja sering membutuhkan 'Surat Lolos Butuh'. Makna birokrasi dari surat tersebut adalah... A. Sekolah asal membutuhkan dana tebusan besar agar pegawai bisa lolos.B. Sekolah tujuan membatalkan penerimaan pegawai tersebut.C. Surat persetujuan resmi dari Instansi Induk (Bupati/Walikota melalui BKD) yang melepas/merelakan pegawai bersangkutan, mengonfirmasi bahwa kepindahannya tidak mengganggu formasi analisa beban kerja daerah asal.D. Pegawai tersebut sedang butuh lolos dari kejaran hutang kredit.E. Sertifikat bebas narkoba dari pihak kepolisian. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Administrasi Kepegawaian Dasar]
+134. Setiap ruangan di instansi pemerintah wajib memajang Daftar Inventaris Ruangan (DIR/KIR). Letak pemasangan fisik DIR yang paling tepat sesuai standar manajemen sarana prasarana adalah... A. Disembunyikan di bawah karpet ruangan agar tidak kotor.B. Dimasukkan ke dalam brankas kepala ruangan.C. Ditempel pada dinding bagian dalam ruangan, di posisi yang mudah dilihat (eye-level) dekat pintu masuk, untuk memudahkan kontrol visual sekilas.D. Ditempel di luar bangunan gedung menghadap ke halaman.E. Digantung di plafon langit-langit dekat lampu ruangan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+135. Pengkodean (Labelling) pada setiap barang BMN (seperti meja kayu) memiliki format angka panjang. Deretan angka spesifik pada label tersebut bertujuan untuk memudahkan operator saat melacak... A. Nama tukang kayu yang membuat meja tersebut 10 tahun lalu.B. Harga jual meja tersebut saat lelang barang antik nantinya.C. Klasifikasi golongan barang, tahun perolehan/pembelian, nomor register aset, dan unit satuan kerja pemilik aset (Geolokasi instansi).D. Berat masa jenis kayu penyusun meja tersebut.E. Tanggal ulang tahun kepala sekolah yang membeli aset tersebut. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+136. Pencatatan antara aset tetap (Aset Kapital) dengan Barang Habis Pakai (BHP) dibedakan secara tegas. Buku administrasi khusus untuk mencatat pergerakan masuk-keluarnya stok spidol, kertas, dan map plastik adalah... A. Buku Ekspedisi Tamu Harian.B. Kartu Inventaris Barang (KIB) F.C. Buku/Kartu Barang Persediaan (Gudang/BHP) berbasis mutasi fisik stok barang.D. Buku Catatan Keuangan Dana BOS (BKU).E. Laporan Penilaian Prestasi Kerja Pegawai Tahunan. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+137. Prosedur Cek Fisik Tahunan (Stock Opname) menemukan sebuah laptop yang statusnya tercatat 'Ada/Baik' di Buku Inventaris, namun fisiknya tidak dapat ditemukan di mana pun (Hilang). Tindakan legal-formal pengurus barang adalah... A. Mencoret data laptop tersebut di aplikasi secara diam-diam dan mengubah jumlah akhirnya agar balance.B. Membeli laptop rakitan murah dari marketplace untuk menyamarkan kekosongan aset tanpa sepengetahuan siapapun.C. Membuat Berita Acara Pemeriksaan Kehilangan, melaporkannya ke kepolisian, dan mengajukan proses Tuntutan Ganti Rugi (TGR) kepada pihak yang bertanggung jawab menghilangkan aset tersebut.D. Menyalahkan siswa yang sedang lewat dan memaksa mereka menggantinya.E. Membiarkan ketidakcocokan data tersebut hingga bertahun-tahun kemudian. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+138. Aset sekolah berupa Gedung Ruang Kelas Baru (RKB) dan Mushola yang baru selesai dibangun dari dana DAK (Dana Alokasi Khusus) Pemerintah Pusat, akan dimasukkan pencatatannya ke dalam format register daerah... A. KIB B (Mesin & Peralatan Khusus)B. KIB A (Tanah Darat & Persawahan)C. KIB C (Gedung dan Bangunan Permanen/Semi-Permanen)D. KIB E (Buku Perpustakaan & Hewan/Tumbuhan)E. Buku Kas Umum (BKU) Pembantu Pajak [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+139. Mekanisme 'Penghapusan' Barang Milik Daerah (Write-Off) dari KIB secara aturan TIDAK BOLEH dilakukan semata-mata karena alasan... A. Barang tersebut sudah rusak berat dan rongsok (biaya perbaikan lebih mahal dari beli baru).B. Barang musnah secara force majeure (bencana gempa/terbakar).C. Warna barang tersebut sudah pudar dan staf tidak menyukai modelnya lagi meskipun secara teknis 100% berfungsi normal dan masih berumur muda.D. Barang hilang dicuri yang telah diterbitkan SP3 (Surat Perintah Penghentian Penyidikan) dari kepolisian.E. Kadaluarsa fungsi teknologi (usang/obsolete) sesuai umur ekonomis. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+140. Saat terjadi pengadaan (pembelian) puluhan unit kursi baru, Panitia Pemeriksa Hasil Pekerjaan (PPHP) menolak menandatangani Berita Acara Serah Terima (BAST). Alasan birokrasi yang paling masuk akal (SJT Area) mengapa PPHP menolak BAST adalah... A. Vendor tidak memberikan uang pelicin/gratifikasi kepada panitia tersebut.B. Sopir mobil pick-up vendor tidak memiliki SIM C yang masih berlaku.C. Spesifikasi material kayu dan ukuran tinggi/lebar kursi yang datang tidak sesuai dengan deskripsi teknis (RKS) pada Surat Perintah Kerja/Kontrak Awal e-Katalog.D. Kursi tiba pada jam 2 siang padahal dijanjikan jam 1 siang pada hari yang sama.E. Ketua panitia PPHP sedang sibuk bermain catur di kantin belakang sekolah. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+141. Konsep 'Pemeliharaan Preventif' (Perawatan Pencegahan) terhadap komputer operasional pelayanan di ruang TU ditunjukkan dengan alokasi jadwal rutin untuk... A. Memukuli monitor PC yang nge-hang agar berfungsi kembali.B. Mematikan daya komputer langsung dengan mencabut colokan listrik dari stopkontak di dinding secara kasar setiap sore.C. Melakukan cleaning disk, defragmentation data, update lisensi antivirus, dan pembersihan debu sirkulasi CPU secara berkala per semester.D. Membongkar seluruh onderdil komponen RAM secara acak setiap akhir pekan dan mencoba merakitnya kembali tanpa panduan.E. Mengganti motherboard baru setiap 3 bulan meskipun perangkat beroperasi normal. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+142. Jika guru IPA ingin meminjam mikroskop inventaris laboratorium untuk kegiatan praktik luar sekolah selama satu minggu, prosedur administrasi sarana (Pengamanan Aset) yang wajib diisi adalah... A. Membayar uang muka pinjaman tunai ke Kepala TU sebesar separuh harga mikroskop.B. Langsung membawa alat tersebut karena beliau adalah guru resmi instansi dan dipercaya 100%.C. Mengisi dan menandatangani Buku Peminjaman Inventaris Sementara (Kartu Bon Pinjam) yang mencantumkan nama peminjam, waktu keluar, durasi kembali, dan kondisi awal fisik alat.D. Meninggalkan KTP asli dan BPKB motor sebagai jaminan di dalam laci operator barang.E. Membuat surat pernyataan resmi di atas materai sepuluh ribu rupiah dan divideo oleh seluruh staf. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+143. Depresiasi (Penyusutan) nilai aset seperti mobil dinas dalam sistem neraca akuntansi Pemda/Sekolah, dikalkulasi dengan tujuan utama... A. Memotong anggaran pengadaan alat tulis kantor pada bulan berikutnya secara proporsional.B. Meningkatkan harga jual kendaraan saat kendaraan tersebut dilelang di pasar gelap.C. Mencatat alokasi sistematis penurunan fungsi/manfaat ekonomi dari usia mobil tersebut secara pelaporan akuntansi wajar (seiring berjalannya tahun ekonomis aset).D. Menyembunyikan pajak kendaraan bermotor (PKB) dari samsat kepolisian.E. Menghukum sopir dinas yang menyebabkan mobil tersebut terlihat lebih tua. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+144. Penerapan sistem masuk-keluar persediaan Gudang BHP menggunakan prinsip 'FIFO' (First In, First Out). Apabila diaplikasikan dalam penataan rak rim kertas HVS (umur simpan rawan lembap), operator harus menata raknya dengan... A. Menaruh tumpukan rim kertas keluaran distributor paling baru (belanjaan bulan ini) di posisi paling depan untuk segera dibuka dan dihabiskan guru.B. Mencampur aduk rim kertas produksi tahun 2024 dan 2026 secara vertikal acak (randomisasi lot) agar adil.C. Mendorong sisa rim kertas lama (belanjaan 6 bulan lalu) ke posisi paling depan/atas, agar stok yang umur penyimpanannya paling lawas dihabiskan pertama kali untuk meminimalisir jamur kertas.D. Hanya menumpuk stok di lantai gudang tanpa menggunakan rak palet sama sekali untuk menghemat tempat.E. Mengunci rak kertas HVS dari guru hingga stok lama membusuk sepenuhnya menjadi pupuk. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]
+145. Peralatan elektronik sisa pembongkaran yang hancur (status KIB: Rusak Berat) masih menumpuk di gudang menunggu SK Penghapusan dari Walikota yang prosesnya bisa setahun. Tindakan fisik administratif Pengurus Barang sambil menunggu proses SK tersebut adalah... A. Membuangnya secara bertahap ke sungai belakang sekolah agar gudang perlahan lega.B. Menitipkan barang rongsok tersebut di rumah pribadi penjaga sekolah tanpa tanda terima resmi.C. Mengelompokkannya di area isolasi (Gudang Rongsok) yang terkunci, melabeli status 'Dalam Proses Usulan Penghapusan (Tidak Bisa Dipakai)', dan memastikan tidak tercampur aset baik.D. Menggunakan dana sekolah untuk memperbaiki barang tersebut meskipun anggaran perbaikan membengkak drastis melebihi batas kelayakan.E. Menjual kiloan komponen tembaga di dalamnya secara senyap, lalu menyimpan bangkai kosongan plastiknya kembali di gudang. [Materi Pokok: Kompetensi Teknis][Kategori: Materi Pokok - Pengelolaan Inventaris Kantor]`;
+
+    const kunciString = "1. B 2. B 3. C 4. C 5. C 6. C 7. C 8. C 9. C 10. C 11. B 12. B 13. B 14. B 15. B 16. B 17. C 18. C 19. C 20. C 21. C 22. C 23. C 24. C 25. C 26. B 27. C 28. B 29. B 30. C 31. B 32. B 33. C 34. C 35. B 36. C 37. C 38. C 39. B 40. C 41. C 42. B 43. C 44. C 45. C 46. C 47. B 48. C 49. C 50. B 51. C 52. C 53. C 54. B 55. C 56. C 57. A 58. C 59. D 60. C 61. A 62. B 63. E 64. B 65. B 66. C 67. C 68. C 69. C 70. C 71. B 72. C 73. C 74. B 75. B 76. C 77. B 78. B 79. A 80. C 81. C 82. A 83. B 84. C 85. B 86. C 87. B 88. C 89. C 90. B 91. B 92. C 93. B 94. C 95. C 96. C 97. C 98. C 99. C 100. C 101. C 102. C 103. B 104. C 105. C 106. C 107. C 108. C 109. C 110. C 111. C 112. C 113. C 114. C 115. C 116. C 117. C 118. C 119. C 120. C 121. C 122. C 123. C 124. C 125. C 126. C 127. C 128. C 129. C 130. C 131. C 132. C 133. C 134. C 135. C 136. C 137. C 138. C 139. C 140. C 141. C 142. C 143. C 144. C 145. C";
+
+        const generateDatabase = () => {
+            const db = [];
+            const kunciMap = {};
+            
+            // PERBAIKAN: Parsing kunci menggunakan RegExp global yang tangguh terhadap variasi spasi
+            const cleanKunciString = kunciString.replace(/\s+/g, ' '); 
+            const kunciPairs = cleanKunciString.match(/(\d+)\.\s*([A-E])/g) || [];
+            kunciPairs.forEach(pair => {
+                const match = pair.match(/(\d+)\.\s*([A-E])/);
+                if (match) {
+                    kunciMap[match[1]] = match[2];
+                }
+            });
+
+            const getBobot = (materi, kunci) => {
+                const options = ['A', 'B', 'C', 'D', 'E'];
+                let bobot = {};
+                
+                // Teknis (Benar = 5, Salah = 0)
+                if (materi.toLowerCase().includes('teknis')) {
+                    options.forEach(opt => {
+                        bobot[opt] = (opt === kunci) ? 5 : 0;
+                    });
+                } else {
+                    // Non-Teknis (Gradasi 1-5 berdasarkan opsi terbaik)
+                    const weightsList = {
+                        'A': [5, 4, 3, 2, 1],
+                        'B': [4, 5, 3, 2, 1],
+                        'C': [2, 4, 5, 3, 1],
+                        'D': [1, 2, 4, 5, 3],
+                        'E': [1, 2, 3, 4, 5]
+                    };
+                    const w = weightsList[kunci] || [0,0,0,0,0];
+                    options.forEach((opt, idx) => {
+                        bobot[opt] = w[idx];
+                    });
+                }
+                return bobot;
+            };
+
+            const lines = rawTextData.split('\n').filter(l => l.trim() !== '');
+            lines.forEach(line => {
+                const idMatch = line.match(/^(\d+)\.\s/);
+                if(!idMatch) return;
+                
+                const rawId = idMatch[1];
+                let textChunk = line.replace(/^(\d+)\.\s/, '');
+                
+                const tagMatch = textChunk.match(/\[Materi.*?:(.*?)\]\[Kategori:\s(.*?)\]/);
+                const materiRaw = tagMatch ? tagMatch[1].trim() : '';
+                const kategori = tagMatch ? tagMatch[2].trim() : '';
+                
+                textChunk = textChunk.replace(/\[Materi.*?\]\[Kategori.*?\]/, '');
+                
+                // PERBAIKAN: Pemisahan Opsi yang lebih presisi
+                const parts = textChunk.split(/(?=\s?A\.\s|\s?B\.\s|\s?C\.\s|\s?D\.\s|\s?E\.\s)/);
+                const pertanyaan = parts[0].trim();
+                
+                let optA='', optB='', optC='', optD='', optE='';
+                let correctText = '';
+                const correctKey = kunciMap[rawId]; // Mengambil kunci berdasarkan Raw ID yang akurat
+
+                parts.slice(1).forEach(p => {
+                    const cleanP = p.trim();
+                    const optVal = cleanP.substring(2).trim(); // Menghapus "A. " dll.
+                    if(cleanP.startsWith('A.')) { optA = optVal; if(correctKey === 'A') correctText = optVal; }
+                    if(cleanP.startsWith('B.')) { optB = optVal; if(correctKey === 'B') correctText = optVal; }
+                    if(cleanP.startsWith('C.')) { optC = optVal; if(correctKey === 'C') correctText = optVal; }
+                    if(cleanP.startsWith('D.')) { optD = optVal; if(correctKey === 'D') correctText = optVal; }
+                    if(cleanP.startsWith('E.')) { optE = optVal; if(correctKey === 'E') correctText = optVal; }
+                });
+
+                const bobotSoal = getBobot(materiRaw, correctKey);
+
+                const pembahasan = `Berdasarkan evaluasi prinsip ${materiRaw} pada indikator [${kategori}], tindakan yang paling representatif dan mendapat poin tertinggi adalah:\n\n✔️ Kunci Jawaban: ${correctKey}\n"${correctText}"\n\nAnalisis Sistem:\nLangkah pada Opsi ${correctKey} dinilai paling tepat karena memberikan penyelesaian masalah yang solutif, komprehensif, dan mematuhi regulasi atau Standar Operasional Perkantoran secara profesional. Untuk opsi lainnya diberikan nilai lebih rendah (pada soal Manajerial/Soskul) atau 0 (pada soal Teknis) karena bersifat parsial, reaktif, atau melanggar prosedur.`;
+
+                db.push({
+                    rawId: parseInt(rawId), 
+                    pertanyaan,
+                    opsi: [
+                        { label: 'A', teks: optA }, { label: 'B', teks: optB }, { label: 'C', teks: optC }, { label: 'D', teks: optD }, { label: 'E', teks: optE }
+                    ],
+                    materiRaw, kategori, 
+                    kunci: correctKey,
+                    bobot: bobotSoal,
+                    pembahasan: pembahasan
+                });
+            });
+
+            // Menyusun Urutan Soal: Teknis(1-90) -> Manajerial -> Soskul -> Wawancara
+            const teknis = db.filter(q => q.materiRaw.toLowerCase().includes('teknis')); 
+            const manajerial = db.filter(q => q.materiRaw.toLowerCase().includes('manajerial')); 
+            const soskul = db.filter(q => q.materiRaw.toLowerCase().includes('sosial')); 
+            const wawancara = db.filter(q => q.materiRaw.toLowerCase().includes('wawancara')); 
+
+            return { teknis, manajerial, soskul, wawancara };
+        };
+
+        const parsedDB = generateDatabase();
+
+        function App() {
+            const [page, setPage] = useState('home'); 
+            const [peserta, setPeserta] = useState('');
+            const [soalList, setSoalList] = useState([]);
+            const [answers, setAnswers] = useState({});
+            const [ragu, setRagu] = useState({});
+            const [time, setTime] = useState(130 * 60);
+
+            const startExam = (nama) => {
+                setPeserta(nama);
+                const finalQuestions = [
+                    ...parsedDB.teknis,
+                    ...parsedDB.manajerial,
+                    ...parsedDB.soskul,
+                    ...parsedDB.wawancara
+                ].map((q, index) => ({
+                    ...q,
+                    displayId: index + 1,
+                    jenis: (index < 90) ? 'Teknis' : 
+                           (index < 115) ? 'Manajerial' : 
+                           (index < 135) ? 'Sosio-Kultural' : 'Wawancara'
+                }));
+
+                setSoalList(finalQuestions);
+                setAnswers({});
+                setRagu({});
+                setTime(130 * 60); // 130 menit
+                setPage('exam');
+            };
+
+            const finishExam = () => setPage('result');
+
+            return (
+                <div className="min-h-screen">
+                    {page === 'home' && <Home onNext={() => setPage('login')} />}
+                    {page === 'login' && <Login onStart={startExam} />}
+                    {page === 'exam' && <Exam soalList={soalList} answers={answers} setAnswers={setAnswers} ragu={ragu} setRagu={setRagu} time={time} setTime={setTime} onFinish={finishExam} nama={peserta} />}
+                    {page === 'result' && <Result soalList={soalList} answers={answers} nama={peserta} onRestart={() => setPage('home')} />}
+                </div>
+            );
+        }
+
+        function Home({ onNext }) {
+            return (
+                <div className="flex justify-center items-center min-h-screen p-4 sm:p-6">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden border border-slate-200">
+                        <div className="bg-cat-gradient p-6 sm:p-8 text-center text-white">
+                            <div className="bg-orange-400 w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-xl flex items-center justify-center mb-4 shadow-lg">
+                                <ShieldIcon />
+                            </div>
+                            <h1 className="text-xl sm:text-2xl font-bold tracking-wide leading-tight">PORTAL SIMULASI MANDIRI CAT BKN</h1>
+                            <p className="text-indigo-200 mt-2 text-sm sm:text-base">Standardisasi Pengadaan PPPK Teknis TENDIK 2026</p>
+                        </div>
+                        <div className="p-5 sm:p-8">
+                            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 sm:p-5 mb-6">
+                                <h3 className="font-bold text-indigo-900 flex items-center gap-2 mb-2 text-sm sm:text-base">
+                                    <InfoIcon /> Kepatuhan Regulasi & Urutan Soal
+                                </h3>
+                                <p className="text-indigo-800 text-xs sm:text-sm leading-relaxed">
+                                    Simulator ini dirancang sesuai <strong>KepmenPANRB No. 347 Tahun 2024</strong>. Soal akan diurutkan secara berurutan: <strong>1. Kompetensi Teknis (1-90), 2. Manajerial (91-115), 3. Sosial Kultural (116-135), dan 4. Wawancara (136-145)</strong>. Perhatian: Saat memasuki soal Wawancara, soal sebelumnya akan <strong>dikunci</strong>.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
+                                <div className="border border-slate-200 rounded-xl p-4 shadow-sm">
+                                    <div className="flex justify-between items-center border-b pb-2 mb-2">
+                                        <h4 className="font-bold text-slate-800 text-xs sm:text-sm">STRUKTUR SOAL (145)</h4>
+                                        <span className="text-blue-600 font-bold text-xs sm:text-sm">Maks 725 Poin</span>
+                                    </div>
+                                    <ul className="text-xs sm:text-sm text-slate-600 space-y-1.5">
+                                        <li className="flex justify-between"><span>• Kompetensi Teknis:</span> <span className="font-bold">90 Soal</span></li>
+                                        <li className="flex justify-between"><span>• Kompetensi Manajerial:</span> <span className="font-bold">25 Soal</span></li>
+                                        <li className="flex justify-between"><span>• Kompetensi Sosio-Kultural:</span> <span className="font-bold">20 Soal</span></li>
+                                        <li className="flex justify-between"><span>• Wawancara Komputer:</span> <span className="font-bold">10 Soal</span></li>
+                                    </ul>
+                                </div>
+                                <div className="border border-slate-200 rounded-xl p-4 shadow-sm">
+                                    <div className="flex justify-between items-center border-b pb-2 mb-2">
+                                        <h4 className="font-bold text-slate-800 text-xs sm:text-sm">PENILAIAN & WAKTU</h4>
+                                    </div>
+                                    <ul className="text-xs sm:text-sm text-slate-600 space-y-1.5">
+                                        <li className="flex justify-between"><span>• Teknis (Benar 5, Salah 0):</span> <span className="font-bold">Maks 450</span></li>
+                                        <li className="flex justify-between"><span>• Manajerial & Soskul (1-5):</span> <span className="font-bold">Maks 225</span></li>
+                                        <li className="flex justify-between"><span>• Wawancara (1-5):</span> <span className="font-bold">Maks 50</span></li>
+                                        <li className="flex justify-between text-indigo-600 font-bold mt-2 pt-2 border-t"><span>• Durasi Waktu Total:</span> <span>130 Menit</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <button onClick={onNext} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 sm:py-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 text-sm sm:text-lg">
+                                Lanjutkan Masuk Halaman Login <ArrowRightIcon />
+                            </button>
+                            <p className="text-center text-[10px] sm:text-xs text-slate-400 mt-6 font-semibold tracking-wider">BADAN KEPEGAWAIAN NEGARA - INDONESIA</p>
+                        </div>
+                    </div>
+                </div>
+            );
+            }
+
+            function Login({ onStart }) {
+            const [nama, setNama] = useState('');
+            const handleSubmit = (e) => { e.preventDefault(); if (nama.trim()) onStart(nama); };
+            return (
+                <div className="flex justify-center items-center min-h-screen p-4 bg-slate-900">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="bg-cat-gradient p-6 sm:p-8 text-center text-white">
+                            <div className="bg-orange-500 w-12 h-12 mx-auto rounded-xl flex items-center justify-center mb-4 shadow-lg">
+                                <BuildingIcon />
+                            </div>
+                            <h2 className="text-lg sm:text-xl font-bold tracking-wide">FORM IDENTITAS PESERTA</h2>
+                            <p className="text-indigo-200 text-xs sm:text-sm mt-1">Spesialisasi: Operator Layanan Operasional</p>
+                        </div>
+                        <div className="p-6 sm:p-8">
+                            <form onSubmit={handleSubmit} className="space-y-5">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-2 tracking-wide uppercase">Nama Lengkap Peserta</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <span className="text-slate-400"><UserIcon /></span>
+                                        </div>
+                                        <input type="text" required value={nama} onChange={(e) => setNama(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm sm:text-base"
+                                            placeholder="Masukkan Nama Lengkap Anda" />
+                                    </div>
+                                </div>
+                                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-lg shadow-md transition-all flex justify-center items-center gap-2 text-sm sm:text-base">
+                                    Masuk Sesi CAT Waktu (130 Menit) <ArrowRightIcon />
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function NavigationMap({ soalList, answers, ragu, currentIndex, onNavRequest, onFinishClick, isWawancaraLocked }) {
+            return (
+                <div className="flex flex-col h-full">
+                    <h3 className="font-bold text-slate-700 text-xs sm:text-sm mb-3">PETA NAVIGASI SOAL</h3>
+                    <div className="flex gap-2 mb-4 shrink-0">
+                        <div className="flex-1 text-center text-[9px] sm:text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 py-1.5 rounded">Sudah</div>
+                        <div className="flex-1 text-center text-[9px] sm:text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-200 py-1.5 rounded">Ragu</div>
+                        <div className="flex-1 text-center text-[9px] sm:text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 py-1.5 rounded">Belum</div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                        <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                            {soalList.map((s, idx) => {
+                                let statusClass = 'nav-belum';
+                                if (ragu[s.displayId]) statusClass = 'nav-ragu';
+                                else if (answers[s.displayId]) statusClass = 'nav-sudah';
+                                
+                                if (currentIndex === idx) statusClass += ' nav-active';
+                                
+                                const isLockedBox = isWawancaraLocked && idx < 135;
+                                if (isLockedBox) {
+                                    statusClass += ' nav-locked';
+                                }
+
+                                return (
+                                    <div key={s.displayId} 
+                                         onClick={() => {
+                                             if(!isLockedBox) onNavRequest(idx);
+                                         }} 
+                                         className={`nav-box ${statusClass}`}
+                                         title={isLockedBox ? "Soal telah dikunci" : `Soal ${s.displayId}`}>
+                                        {s.displayId}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    
+                    <div className="pt-4 shrink-0 mt-auto">
+                        <button onClick={onFinishClick} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow flex justify-center items-center gap-2 text-sm">
+                            <CheckCircleIcon /> Selesai Ujian CAT
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function Exam({ soalList, answers, setAnswers, ragu, setRagu, time, setTime, onFinish, nama }) {
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [showModalSelesai, setShowModalSelesai] = useState(false);
+            const [showMobileMenu, setShowMobileMenu] = useState(false);
+            
+            const [isWawancaraLocked, setIsWawancaraLocked] = useState(false);
+            const [showWawancaraWarning, setShowWawancaraWarning] = useState(false);
+            const [pendingNavIndex, setPendingNavIndex] = useState(null);
+
+            const soal = soalList[currentIndex];
+
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    setTime((prev) => {
+                        if (prev <= 1) { clearInterval(timer); onFinish(); return 0; }
+                        return prev - 1;
+                    });
+                }, 1000);
+                return () => clearInterval(timer);
+            }, [onFinish, setTime]);
+
+            const formatTime = (seconds) => {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = seconds % 60;
+                return `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            };
+
+            const handleAnswer = (opsi) => {
+                if (isWawancaraLocked && currentIndex < 135) return;
+                setAnswers({ ...answers, [soal.displayId]: opsi });
+                if (ragu[soal.displayId]) {
+                    const newRagu = { ...ragu };
+                    delete newRagu[soal.displayId];
+                    setRagu(newRagu);
+                }
+            };
+
+            const toggleRagu = () => {
+                if (isWawancaraLocked && currentIndex < 135) return;
+                setRagu({ ...ragu, [soal.displayId]: !ragu[soal.displayId] });
+            };
+
+            const handleNavRequest = (targetIndex) => {
+                if (targetIndex < 0 || targetIndex >= soalList.length) return;
+
+                if (targetIndex >= 135 && !isWawancaraLocked) {
+                    setPendingNavIndex(targetIndex);
+                    setShowWawancaraWarning(true);
+                    return;
+                }
+
+                if (isWawancaraLocked && targetIndex < 135) return;
+
+                setCurrentIndex(targetIndex);
+                setShowMobileMenu(false);
+            };
+
+            const confirmLockWawancara = () => {
+                setIsWawancaraLocked(true);
+                setCurrentIndex(pendingNavIndex);
+                setShowWawancaraWarning(false);
+                setShowMobileMenu(false);
+            };
+
+            return (
+                <div className="flex flex-col h-[100dvh] overflow-hidden bg-slate-50">
+                    
+                    <div className="bg-cat-gradient text-white flex justify-between items-center px-4 sm:px-6 py-2.5 sm:py-3 shadow-md shrink-0 z-20">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="bg-orange-500 p-1.5 sm:p-2 rounded-lg hidden sm:block"><ShieldIcon /></div>
+                            <div>
+                                <h1 className="font-bold text-sm sm:text-lg leading-tight">UJIAN CAT TENDIK</h1>
+                                <p className="text-[10px] sm:text-xs text-indigo-200 hidden sm:block">Operator Layanan Operasional</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-4">
+                            <div className="bg-slate-900/50 border border-indigo-400/30 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg flex items-center gap-2">
+                                <span className="text-indigo-200 text-[10px] sm:text-xs font-bold uppercase hidden md:block">Sisa Waktu</span>
+                                <div className="flex items-center gap-1.5 font-mono text-base sm:text-xl font-bold text-yellow-400">
+                                    <ClockIcon /> {formatTime(time)}
+                                </div>
+                            </div>
+                            <button onClick={() => setShowMobileMenu(true)} className="md:hidden bg-indigo-800/80 p-2 rounded-lg text-white hover:bg-indigo-700 active:scale-95 transition-transform">
+                                <GridMenuIcon />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-1 overflow-hidden relative">
+                        
+                        <div className="w-64 bg-white border-r border-slate-200 p-4 flex flex-col shrink-0 hidden lg:flex">
+                            <div className="text-center mb-6 pt-2">
+                                <div className="w-16 h-16 bg-indigo-100 rounded-full mx-auto flex items-center justify-center text-indigo-400 mb-3">
+                                    <UserIcon />
+                                </div>
+                                <h2 className="font-bold text-slate-800 text-base">{nama}</h2>
+                                <p className="text-[11px] font-bold text-blue-600 mt-1">FORMASI TENDIK</p>
+                            </div>
+                            <div className="border-t border-slate-100 pt-4 mb-4">
+                                <div className="flex justify-between text-xs mb-2"><span className="text-slate-500">Total Soal:</span><span className="font-bold text-slate-800">145 Butir</span></div>
+                                <div className="flex justify-between text-xs mb-2"><span className="text-blue-600 font-bold">1. Teknis:</span><span className="font-medium text-slate-700">01 - 90</span></div>
+                                <div className="flex justify-between text-xs mb-2"><span className="text-teal-600 font-bold">2. Manajerial:</span><span className="font-medium text-slate-700">91 - 115</span></div>
+                                <div className="flex justify-between text-xs mb-2"><span className="text-red-500 font-bold">3. Sosio-Kultural:</span><span className="font-medium text-slate-700">116 - 135</span></div>
+                                <div className="flex justify-between text-xs mt-3 pt-3 border-t border-dashed">
+                                    <span className="text-emerald-600 font-bold flex items-center gap-1">4. Wawancara {isWawancaraLocked && <LockIcon/>}:</span>
+                                    <span className="font-bold text-slate-800">136 - 145</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 flex flex-col min-w-0 bg-slate-50 relative">
+                            
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 w-full custom-scrollbar">
+                                <div className="max-w-3xl mx-auto w-full pb-4">
+                                    
+                                    <div className="flex flex-wrap items-center gap-2 mb-5">
+                                        <span className="bg-blue-600 text-white font-bold px-3 py-1 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm shadow-sm shrink-0">
+                                            SOAL {String(soal.displayId).padStart(3, '0')}
+                                        </span>
+                                        <span className="bg-indigo-100 text-indigo-800 font-bold px-2 py-1 sm:px-3 py-1.5 rounded-md text-[10px] sm:text-xs uppercase tracking-wide border border-indigo-200 break-words">
+                                            {soal.jenis} • {soal.kategori}
+                                        </span>
+                                        {isWawancaraLocked && currentIndex >= 135 && (
+                                            <span className="bg-red-100 text-red-600 font-bold px-2 py-1 rounded-md text-[10px] sm:text-xs flex items-center gap-1 border border-red-200">
+                                                <LockIcon /> Area Wawancara Terkunci
+                                            </span>
+                                        )}
+                                    </div>
+                                    
+                                    <p className="text-base sm:text-lg text-slate-800 leading-relaxed mb-6 font-medium text-justify">
+                                        {soal.pertanyaan}
+                                    </p>
+
+                                    <div className="space-y-2.5 sm:space-y-3">
+                                        {soal.opsi.map((opt) => (
+                                            <div key={opt.label} onClick={() => handleAnswer(opt.label)}
+                                                className={`p-3 sm:p-4 rounded-xl border-2 flex gap-3 sm:gap-4 items-start 
+                                                ${answers[soal.displayId] === opt.label ? 'option-selected' : 'border-slate-200 bg-white'}
+                                                ${(isWawancaraLocked && currentIndex < 135) ? 'opacity-80 cursor-not-allowed' : 'option-hover'}`}>
+                                                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 font-bold text-xs sm:text-sm ${answers[soal.displayId] === opt.label ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                                    {opt.label}
+                                                </div>
+                                                <div className="text-slate-700 pt-0.5 sm:pt-1 leading-relaxed text-sm sm:text-base">
+                                                    {opt.teks}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white border-t border-slate-200 p-3 sm:p-4 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10 w-full">
+                                <div className="max-w-3xl mx-auto flex justify-between items-center w-full gap-2">
+                                    <button onClick={() => handleNavRequest(currentIndex - 1)} 
+                                        disabled={currentIndex === 0 || (isWawancaraLocked && currentIndex === 135)}
+                                        className="px-3 sm:px-5 py-2.5 sm:py-3 rounded-lg font-bold text-xs sm:text-sm border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center flex-1 sm:flex-none">
+                                        &lt; <span className="hidden sm:inline ml-1">Sebelumnya</span>
+                                    </button>
+                                    
+                                    <button onClick={toggleRagu} disabled={isWawancaraLocked && currentIndex < 135}
+                                        className={`px-3 sm:px-5 py-2.5 sm:py-3 rounded-lg font-bold text-xs sm:text-sm border flex items-center justify-center gap-1.5 sm:gap-2 flex-1 sm:flex-none disabled:opacity-50
+                                        ${ragu[soal.displayId] ? 'btn-ragu' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
+                                        <div className={`w-2.5 h-2.5 rounded-full ${ragu[soal.displayId] ? 'bg-orange-500' : 'bg-slate-300'}`}></div> 
+                                        Ragu
+                                    </button>
+
+                                    <button onClick={() => handleNavRequest(currentIndex + 1)} disabled={currentIndex === soalList.length - 1}
+                                        className="px-3 sm:px-5 py-2.5 sm:py-3 rounded-lg font-bold text-xs sm:text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center flex-1 sm:flex-none transition-colors">
+                                        <span className="hidden sm:inline mr-1">{currentIndex === 134 ? 'Masuk Wawancara' : 'Selanjutnya'}</span> &gt;
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="w-72 bg-white border-l border-slate-200 p-4 flex flex-col shrink-0 hidden md:flex z-10">
+                            <NavigationMap 
+                                soalList={soalList} answers={answers} ragu={ragu} 
+                                currentIndex={currentIndex} 
+                                onNavRequest={handleNavRequest} 
+                                onFinishClick={() => setShowModalSelesai(true)} 
+                                isWawancaraLocked={isWawancaraLocked}
+                            />
+                        </div>
+                    </div>
+
+                    {showMobileMenu && (
+                        <div className="md:hidden fixed inset-0 z-50 flex justify-end bg-slate-900/60 animate-fade-in backdrop-blur-sm" onClick={() => setShowMobileMenu(false)}>
+                            <div className="bg-white w-[85%] max-w-[320px] h-full flex flex-col shadow-2xl animate-slide-in" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50 shrink-0">
+                                    <h2 className="font-bold text-slate-800 text-sm">Daftar Soal</h2>
+                                    <button onClick={() => setShowMobileMenu(false)} className="p-1.5 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300">
+                                        <XIcon />
+                                    </button>
+                                </div>
+                                <div className="p-4 flex-1 overflow-hidden flex flex-col">
+                                    <NavigationMap 
+                                        soalList={soalList} answers={answers} ragu={ragu} 
+                                        currentIndex={currentIndex} 
+                                        onNavRequest={handleNavRequest} 
+                                        onFinishClick={() => { setShowMobileMenu(false); setShowModalSelesai(true); }} 
+                                        isWawancaraLocked={isWawancaraLocked}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showWawancaraWarning && (
+                        <div className="fixed inset-0 bg-slate-900/80 flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
+                            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border-t-4 border-red-500">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center shrink-0">
+                                        <AlertTriangleIcon />
+                                    </div>
+                                    <h2 className="text-lg sm:text-xl font-bold text-slate-800 leading-tight">Peringatan: Sesi Wawancara</h2>
+                                </div>
+                                <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6">
+                                    <p className="text-sm text-slate-700 leading-relaxed mb-2">
+                                        Anda akan memasuki sesi Wawancara (Soal 136 - 145).
+                                    </p>
+                                    <p className="text-sm font-bold text-red-600 leading-relaxed">
+                                        Sesuai aturan CAT BKN, jika Anda melanjutkan, maka seluruh soal sebelumnya (No. 1 - 135) akan DIKUNCI PERMANEN.
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-2">Anda tidak akan bisa kembali untuk memperbaiki atau mengubah jawaban pada bagian Teknis, Manajerial, maupun Sosial Kultural.</p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <button onClick={() => setShowWawancaraWarning(false)} className="flex-1 py-3 px-4 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 text-sm transition-colors">
+                                        Batal & Periksa Lagi
+                                    </button>
+                                    <button onClick={confirmLockWawancara} className="flex-1 py-3 px-4 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 text-sm shadow-md transition-colors flex justify-center items-center gap-2">
+                                        <LockIcon /> Ya, Kunci & Lanjut
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showModalSelesai && (
+                        <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+                            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full text-center">
+                                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-emerald-100 text-emerald-600 rounded-full mx-auto flex items-center justify-center mb-4">
+                                    <CheckCircleIcon />
+                                </div>
+                                <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Selesaikan Sesi Ujian?</h2>
+                                <p className="text-xs sm:text-sm text-slate-600 mb-6">Pastikan kembali seluruh lembar jawaban Anda telah terisi dan tidak ada status ragu-ragu.</p>
+                                <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+                                    <button onClick={() => setShowModalSelesai(false)} className="flex-1 py-3 sm:py-2.5 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 text-sm">Kembali Ujian</button>
+                                    <button onClick={onFinish} className="flex-1 py-3 sm:py-2.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 text-sm">Ya, Kumpulkan</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function Result({ soalList, answers, nama, onRestart }) {
+            let scoreTeknis = 0; 
+            let scoreManajerial = 0; 
+            let scoreSoskul = 0; 
+            let scoreWawancara = 0; 
+
+            let totalBenar = 0;
+            let totalSalah = 0;
+            let totalKosong = 0;
+
+            soalList.forEach(s => {
+                const ans = answers[s.displayId];
+                
+                if (!ans) {
+                    totalKosong++;
+                    return; 
+                }
+
+                const isCorrect = ans === s.kunci;
+                const poinDidapat = s.bobot[ans] || 0;
+
+                // STATISTIK: Untuk Non-Teknis, meskipun dapat poin (misal poin 4) tapi bukan kunci (poin 5), dianggap "Salah Kunci Utama" di meteran ini.
+                if (isCorrect) {
+                    totalBenar++;
+                } else {
+                    totalSalah++;
+                }
+
+                if (s.jenis === 'Teknis') {
+                    scoreTeknis += poinDidapat;
+                } else if (s.jenis === 'Manajerial') {
+                    scoreManajerial += poinDidapat; 
+                } else if (s.jenis === 'Sosio-Kultural') {
+                    scoreSoskul += poinDidapat;
+                } else if (s.jenis === 'Wawancara') {
+                    scoreWawancara += poinDidapat;
+                }
+            });
+
+            const totalScore = scoreTeknis + scoreManajerial + scoreSoskul + scoreWawancara;
+            const isLulus = scoreManajerial + scoreSoskul >= 117 && scoreWawancara >= 24; 
+
+            return (
+                <div className="min-h-screen bg-slate-50 p-3 sm:p-4 md:p-8">
+                    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+                        
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-8 text-center relative overflow-hidden">
+                            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-emerald-100 text-emerald-600 rounded-full mx-auto flex items-center justify-center mb-3 sm:mb-4">
+                                <CheckCircleIcon />
+                            </div>
+                            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 leading-tight">Evaluasi Hasil CAT BKN</h1>
+                            <p className="text-slate-500 text-xs sm:text-sm mt-1 mb-6">Laporan pencapaian nilai riil atas nama <strong>{nama}</strong>.</p>
+                            
+                            {/* Alert jika ada soal kosong */}
+                            {totalKosong > 0 && (
+                                <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg flex items-center justify-center gap-2">
+                                    <AlertTriangleIcon />
+                                    Terdapat <strong>{totalKosong} soal tidak dijawab</strong> yang langsung diberikan nilai 0 (Nol).
+                                </div>
+                            )}
+
+                            {/* Rekap Total Jawaban Benar, Salah, Kosong */}
+                            <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mb-8">
+                                <div className="flex-1 min-w-[90px] bg-emerald-50 border border-emerald-200 rounded-xl py-3 px-2 sm:px-4 text-center shadow-sm">
+                                    <div className="text-emerald-800 text-[10px] sm:text-xs font-bold uppercase mb-1">Benar</div>
+                                    <div className="text-2xl sm:text-3xl font-black text-emerald-600">{totalBenar}</div>
+                                </div>
+                                <div className="flex-1 min-w-[90px] bg-rose-50 border border-rose-200 rounded-xl py-3 px-2 sm:px-4 text-center shadow-sm">
+                                    <div className="text-rose-800 text-[10px] sm:text-xs font-bold uppercase mb-1">Salah</div>
+                                    <div className="text-2xl sm:text-3xl font-black text-rose-600">{totalSalah}</div>
+                                </div>
+                                <div className="flex-1 min-w-[90px] bg-slate-100 border border-slate-200 rounded-xl py-3 px-2 sm:px-4 text-center shadow-sm">
+                                    <div className="text-slate-600 text-[10px] sm:text-xs font-bold uppercase mb-1">Kosong / Nol</div>
+                                    <div className="text-2xl sm:text-3xl font-black text-slate-700">{totalKosong}</div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 sm:p-4">
+                                    <div className="text-[10px] sm:text-xs font-bold text-blue-800 uppercase mb-1">1. Teknis</div>
+                                    <div className="text-xl sm:text-2xl font-bold text-blue-600">{scoreTeknis} Pts</div>
+                                    <div className="text-[9px] sm:text-[10px] text-blue-400 mt-1">Maks 450 Poin</div>
+                                </div>
+                                <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 sm:p-4">
+                                    <div className="text-[10px] sm:text-xs font-bold text-teal-800 uppercase mb-1">2. Manajerial</div>
+                                    <div className="text-xl sm:text-2xl font-bold text-teal-600">{scoreManajerial} Pts</div>
+                                    <div className="text-[9px] sm:text-[10px] text-teal-400 mt-1">Maks 125 Poin</div>
+                                </div>
+                                <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 sm:p-4">
+                                    <div className="text-[10px] sm:text-xs font-bold text-orange-800 uppercase mb-1">3. Sosio-Kultural</div>
+                                    <div className="text-xl sm:text-2xl font-bold text-orange-600">{scoreSoskul} Pts</div>
+                                    <div className="text-[9px] sm:text-[10px] text-orange-400 mt-1">Maks 100 Poin</div>
+                                </div>
+                                <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 sm:p-4">
+                                    <div className="text-[10px] sm:text-xs font-bold text-purple-800 uppercase mb-1">4. Wawancara</div>
+                                    <div className="text-xl sm:text-2xl font-bold text-purple-600">{scoreWawancara} Pts</div>
+                                    <div className="text-[9px] sm:text-[10px] text-purple-400 mt-1">Maks 50 Poin</div>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col md:flex-row justify-between items-center border-t border-slate-100 pt-5 sm:pt-6 gap-4">
+                                <div className="text-center md:text-left">
+                                    <div className="text-xs sm:text-sm font-bold text-slate-500">Total Akumulasi Nilai:</div>
+                                    <div className="text-2xl sm:text-3xl font-black text-slate-800">{totalScore} <span className="text-sm sm:text-lg font-normal text-slate-400">/ 725</span></div>
+                                </div>
+                                <div className={`w-full md:w-auto px-4 py-3 sm:py-2 rounded-lg font-bold border text-xs sm:text-sm ${isLulus ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                    STATUS: {isLulus ? 'LULUS PASSING GRADE' : 'TIDAK LULUS PG'}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* PEMBAHASAN SECTION */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 md:p-8">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-5 border-b pb-3 sm:pb-4 flex items-center gap-2">
+                                <InfoIcon />
+                                Kunci Jawaban & Rincian Bobot
+                            </h2>
+                            <div className="space-y-6 sm:space-y-8">
+                                {soalList.map((s) => {
+                                    const ans = answers[s.displayId];
+                                    const isCorrect = ans === s.kunci;
+                                    const isBlank = !ans;
+
+                                    let poinDidapat = 0;
+                                    if(!isBlank) {
+                                        poinDidapat = s.bobot[ans] || 0;
+                                    }
+
+                                    return (
+                                        <div key={s.displayId} id={`bahas-${s.displayId}`} className="border border-slate-200 rounded-xl overflow-hidden">
+                                            <div className="bg-slate-50 px-3 sm:px-4 py-2.5 border-b border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                                                <span className="text-[10px] sm:text-xs font-bold text-indigo-800 uppercase tracking-wide">
+                                                    SOAL {s.displayId} • {s.kategori}
+                                                </span>
+                                                <span className={`text-[10px] sm:text-xs font-bold px-2 py-1 rounded w-fit 
+                                                    ${isCorrect ? 'bg-emerald-100 text-emerald-800' : (isBlank ? 'bg-slate-200 text-slate-600' : 'bg-rose-100 text-rose-800')}`}>
+                                                    {isBlank ? 'KOSONG (0 Poin)' : `Didapat: +${poinDidapat} Poin`}
+                                                </span>
+                                            </div>
+                                            <div className="p-4 sm:p-5 space-y-4">
+                                                <p className="text-slate-800 font-medium text-sm leading-relaxed text-justify">{s.pertanyaan}</p>
+                                                
+                                                <div className="space-y-2.5">
+                                                    {s.opsi.map(opt => {
+                                                        let optClass = "p-3 sm:p-4 rounded-xl border-2 text-xs sm:text-sm flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 transition-colors ";
+                                                        
+                                                        // Opsi yang benar (Kunci 5 Poin)
+                                                        if (opt.label === s.kunci) {
+                                                            optClass += "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-sm font-semibold";
+                                                        } 
+                                                        // Opsi salah yang dipilih user
+                                                        else if (opt.label === ans && ans !== s.kunci) {
+                                                            optClass += "bg-rose-50 border-rose-400 text-rose-900 font-medium opacity-90";
+                                                        } 
+                                                        // Opsi lainnya
+                                                        else {
+                                                            optClass += "bg-white border-slate-200 text-slate-600";
+                                                        }
+
+                                                        return (
+                                                            <div key={opt.label} className={optClass}>
+                                                                <div className="flex gap-2 w-full justify-between items-start">
+                                                                    <div className="flex gap-2">
+                                                                        <span className="shrink-0 w-6 font-bold">{opt.label}.</span>
+                                                                        <span className="flex-1 leading-relaxed">{opt.teks}</span>
+                                                                    </div>
+                                                                    <span className="shrink-0 ml-2 bg-slate-200 text-slate-700 px-2 py-1 rounded text-[10px] font-bold">
+                                                                        {s.bobot[opt.label]} Poin
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex gap-2 mt-2 sm:mt-0 justify-end sm:justify-start w-full sm:w-auto">
+                                                                    {opt.label === s.kunci && (
+                                                                        <span className="shrink-0 bg-emerald-600 text-white text-[10px] px-2 py-1 rounded-md font-bold uppercase flex items-center gap-1">
+                                                                            <TrueCheckIcon /> Kunci Jawaban
+                                                                        </span>
+                                                                    )}
+                                                                    {opt.label === ans && ans !== s.kunci && (
+                                                                        <span className="shrink-0 bg-rose-500 text-white text-[10px] px-2 py-1 rounded-md font-bold uppercase flex items-center gap-1">
+                                                                            <FalseXIcon /> Jawabanmu
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+
+                                                <div className="mt-4 p-4 sm:p-5 bg-indigo-50/50 border border-indigo-100 rounded-xl">
+                                                    <h4 className="font-bold text-indigo-800 text-xs sm:text-sm mb-2 flex items-center gap-1.5">
+                                                        <InfoIcon /> Pembahasan Analitis
+                                                    </h4>
+                                                    <p className="text-indigo-900 text-[13px] sm:text-sm leading-relaxed text-justify whitespace-pre-line">
+                                                        {s.pembahasan}
+                                                    </p>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+
+                            <div className="mt-8 text-center">
+                                <button onClick={onRestart} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-8 rounded-xl shadow-md transition-all text-sm sm:text-base">
+                                    Ulangi Latihan Simulasi CAT
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
